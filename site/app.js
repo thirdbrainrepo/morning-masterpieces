@@ -23,10 +23,16 @@ function indexFor(date) {
   return ((days % n) + n) % n;
 }
 
+function currentItem() {
+  return manifest.items[indexFor(new Date(Date.now() + offset * 86_400_000))];
+}
+
 function render() {
   const date = new Date(Date.now() + offset * 86_400_000);
   const idx = indexFor(date);
   const item = manifest.items[idx];
+
+  stopDocent(); // navigation ends the current reading
 
   $('dateline').textContent = date.toLocaleDateString(undefined, {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
@@ -55,8 +61,12 @@ function render() {
   $('art-lookfor').textContent = item.lookFor;
 
   $('museum-link').href = item.objectUrl;
-  $('wallpaper-link').href = item.wallpaper;
-  $('wallpaper-ipad-link').href = item.wallpaperIpad;
+  const wall = $('wallpaper-link');
+  wall.href = item.wallpaper;
+  wall.download = `${item.slug}-wallpaper-iphone.jpg`;
+  const wallIpad = $('wallpaper-ipad-link');
+  wallIpad.href = item.wallpaperIpad;
+  wallIpad.download = `${item.slug}-wallpaper-ipad.jpg`;
   $('art-license').textContent = `Image: ${item.license}`;
 
   $('today-btn').style.visibility = offset === 0 ? 'hidden' : 'visible';
@@ -64,6 +74,7 @@ function render() {
     ? 'Morning Masterpieces'
     : `${item.title} — Morning Masterpieces`;
   window.scrollTo({ top: 0 });
+  $('panel').scrollTop = 0;
 }
 
 function toast(msg) {
@@ -74,7 +85,7 @@ function toast(msg) {
 }
 
 async function askPrompt() {
-  const item = manifest.items[indexFor(new Date(Date.now() + offset * 86_400_000))];
+  const item = currentItem();
   const text =
     `I'm looking at "${item.title}" (${item.year}) by ${item.artist}, ` +
     `${item.medium.toLowerCase()}, now in the collection of ${item.museum}. ` +
@@ -85,6 +96,110 @@ async function askPrompt() {
   } catch {
     toast('Could not copy');
   }
+}
+
+/* ── Docent: on-device text-to-speech via the Web Speech API ────────
+   iOS exposes its downloaded system voices to SpeechSynthesis; long text
+   is chunked at sentence boundaries because very long utterances can be
+   cut off or paused by the engine. */
+
+const docent = { playing: false };
+
+function bestVoice() {
+  const lang = navigator.language || 'en-US';
+  const voices = speechSynthesis.getVoices()
+    .filter((v) => v.lang.startsWith(lang.slice(0, 2)));
+  return (
+    voices.find((v) => /premium|enhanced/i.test(v.name)) ||
+    voices.find((v) => v.lang === lang && v.localService) ||
+    voices.find((v) => v.default) ||
+    voices[0] || null
+  );
+}
+
+function docentChunks(item) {
+  const script =
+    `${item.title}. ${item.artist}, ${item.year}. ` +
+    `${item.lesson} ... Look closer. ${item.lookFor}`;
+  const sentences = script.split(/(?<=[.!?])\s+(?=[A-Z“"'])/);
+  const chunks = [];
+  let cur = '';
+  for (const s of sentences) {
+    if (cur && (cur.length + s.length) > 250) { chunks.push(cur); cur = s; }
+    else cur = cur ? `${cur} ${s}` : s;
+  }
+  if (cur) chunks.push(cur);
+  return chunks;
+}
+
+function updateDocentUI() {
+  $('listen-btn').textContent = docent.playing
+    ? '■ Stop the docent'
+    : 'Listen — the docent reads today’s lesson';
+  $('lightbox-listen').textContent = docent.playing ? '■ Stop' : 'Listen';
+}
+
+function stopDocent() {
+  docent.playing = false;
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+  updateDocentUI();
+}
+
+function startDocent() {
+  if (!('speechSynthesis' in window)) { toast('Speech is not available here'); return; }
+  stopDocent();
+  const chunks = docentChunks(currentItem());
+  const voice = bestVoice();
+  docent.playing = true;
+  updateDocentUI();
+  let i = 0;
+  const next = () => {
+    if (!docent.playing || i >= chunks.length) { stopDocent(); return; }
+    const u = new SpeechSynthesisUtterance(chunks[i++]);
+    if (voice) u.voice = voice;
+    u.rate = 0.95;
+    u.onend = next;
+    u.onerror = () => stopDocent();
+    speechSynthesis.speak(u);
+  };
+  next();
+}
+
+function toggleDocent() {
+  docent.playing ? stopDocent() : startDocent();
+}
+
+/* ── Fullscreen viewer ────────────────────────────────────────────── */
+
+let hintTimer = null;
+
+function updateRotateHint() {
+  const img = $('lightbox-img');
+  if (!img.naturalWidth) return;
+  const mismatch =
+    (img.naturalWidth > img.naturalHeight) !== (innerWidth > innerHeight);
+  const hint = $('rotate-hint');
+  clearTimeout(hintTimer);
+  hint.hidden = !mismatch;
+  if (mismatch) hintTimer = setTimeout(() => { hint.hidden = true; }, 3500);
+}
+
+function openLightbox() {
+  const item = currentItem();
+  const img = $('lightbox-img');
+  img.src = item.zoom || item.image;
+  img.alt = `${item.title} by ${item.artist}`;
+  img.onload = updateRotateHint;
+  $('lightbox').hidden = false;
+  document.body.classList.add('lightbox-open');
+  const lb = $('lightbox');
+  (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
+}
+
+function closeLightbox() {
+  $('lightbox').hidden = true;
+  document.body.classList.remove('lightbox-open');
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 
 async function init() {
@@ -99,6 +214,31 @@ async function init() {
   $('next-btn').addEventListener('click', () => { offset += 1; render(); });
   $('today-btn').addEventListener('click', () => { offset = 0; render(); });
   $('ask-btn').addEventListener('click', askPrompt);
+  $('listen-btn').addEventListener('click', toggleDocent);
+  $('lightbox-listen').addEventListener('click', toggleDocent);
+
+  $('fullscreen-btn').addEventListener('click', openLightbox);
+  $('art-image').addEventListener('click', openLightbox);
+  $('lightbox-close').addEventListener('click', closeLightbox);
+  $('lightbox').addEventListener('click', (e) => {
+    if (e.target === $('lightbox') || e.target === $('lightbox-img')) closeLightbox();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('lightbox').hidden) closeLightbox();
+  });
+  document.addEventListener('fullscreenchange', () => {
+    if (!document.fullscreenElement && !$('lightbox').hidden) closeLightbox();
+  });
+  addEventListener('resize', () => {
+    if (!$('lightbox').hidden) updateRotateHint();
+  });
+
+  // iOS populates the voice list lazily; warming it here means the first
+  // docent tap already has the good voices available.
+  if ('speechSynthesis' in window) {
+    speechSynthesis.getVoices();
+    speechSynthesis.addEventListener?.('voiceschanged', () => speechSynthesis.getVoices());
+  }
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

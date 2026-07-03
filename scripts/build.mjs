@@ -147,18 +147,20 @@ function norm(s) {
 }
 
 async function download(url, dest) {
-  if (existsSync(dest) && !FORCE) return 'cached';
+  // Originals are immutable — never re-download (even under --force, which
+  // only reprocesses variants). Delete .cache/originals/ to truly refetch.
+  if (existsSync(dest)) return 'cached';
   const res = await fetchWithRetry(url, { timeout: 300_000 });
   if (!res.ok) throw new Error(`download HTTP ${res.status}`);
   await pipeline(Readable.fromWeb(res.body), createWriteStream(dest));
   return 'downloaded';
 }
 
+const VARIANT_DIRS = ['wall', 'wall-ipad', 'home', 'home-ipad', 'zoom', 'display'];
+
 async function processImages(seed, original) {
-  const wall = path.join(SITE, 'images', 'wall', `${seed.slug}.jpg`);
-  const wallIpad = path.join(SITE, 'images', 'wall-ipad', `${seed.slug}.jpg`);
-  const display = path.join(SITE, 'images', 'display', `${seed.slug}.jpg`);
-  if (existsSync(wall) && existsSync(wallIpad) && existsSync(display) && !FORCE) return 'cached';
+  const outputs = VARIANT_DIRS.map((d) => path.join(SITE, 'images', d, `${seed.slug}.jpg`));
+  if (outputs.every((p) => existsSync(p)) && !FORCE) return 'cached';
   await run(PYTHON, [
     PROCESS, original, SITE, seed.slug,
     '--title', seed.title, '--artist', seed.artist, '--year', seed.year,
@@ -181,9 +183,9 @@ async function mapLimit(items, limit, fn) {
 
 async function main() {
   await mkdir(CACHE, { recursive: true });
-  await mkdir(path.join(SITE, 'images', 'wall'), { recursive: true });
-  await mkdir(path.join(SITE, 'images', 'wall-ipad'), { recursive: true });
-  await mkdir(path.join(SITE, 'images', 'display'), { recursive: true });
+  for (const d of VARIANT_DIRS) {
+    await mkdir(path.join(SITE, 'images', d), { recursive: true });
+  }
   await mkdir(path.join(SITE, 'icons'), { recursive: true });
   if (!VERIFY_ONLY) PYTHON = await detectPython();
 
@@ -253,8 +255,11 @@ async function main() {
     objectUrl: resolved.objectUrl,
     license: resolved.license,
     image: `images/display/${seed.slug}.jpg`,
+    zoom: `images/zoom/${seed.slug}.jpg`,
     wallpaper: `images/wall/${seed.slug}.jpg`,
     wallpaperIpad: `images/wall-ipad/${seed.slug}.jpg`,
+    home: `images/home/${seed.slug}.jpg`,
+    homeIpad: `images/home-ipad/${seed.slug}.jpg`,
     lesson: seed.lesson.trim(),
     lookFor: seed.lookFor.trim(),
   }));

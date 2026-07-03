@@ -31,14 +31,15 @@ ART_MAX_W = int(W * 0.865)      # 1418
 ART_MAX_H = int(H * 0.68)       # 1604
 ART_CENTER_Y = int(H * 0.560)   # painting sits below the clock zone
 
-# Square iPad canvas: 11" iPad Pro is 2388x1668. Portrait crop shows the
-# central 1668-wide column; landscape shows the central 1668-tall band with
-# the clock over its top ~340px. The art box below keeps painting + caption
-# inside the intersection of both visible regions, clear of both clocks.
-SQ = 2388
+# Square iPad canvas: 11" iPad Pro panel is 2420x1668, so a 2420 square is
+# pixel-exact in portrait (no iPadOS upscale softening the caption). Portrait
+# crop shows the central 1668-wide column; landscape shows the central
+# 1668-tall band with the clock over its top ~340px. The art box keeps
+# painting + caption inside the intersection of both visible regions.
+SQ = 2420
 SQ_ART_MAX_W = 1500             # within the 1668 portrait column, with margin
-SQ_ART_MAX_H = 1050             # landscape band minus clock zone and caption
-SQ_ART_CENTER_Y = 1310
+SQ_ART_MAX_H = 1060             # landscape band minus clock zone and caption
+SQ_ART_CENTER_Y = 1330
 
 FONT_CANDIDATES = [
     "/System/Library/Fonts/Supplemental/Georgia.ttf",
@@ -101,14 +102,16 @@ def compose(img, title, artist, year, out_path,
     ImageDraw.Draw(canvas).rectangle([x - 1, y - 1, x + pw, y + ph], outline=hairline)
 
     draw = ImageDraw.Draw(canvas)
-    title_font = fitted_font(draw, title, 42, caption_max_w)
+    title_font = fitted_font(draw, title, 46, caption_max_w)
     meta_line = f"{artist}  ·  {year}"
-    meta_font = fitted_font(draw, meta_line, 30, caption_max_w)
-    ty = y + ph + 66
-    draw.text((cw / 2, ty), title, font=title_font, fill=(226, 222, 212), anchor="mm")
-    draw.text((cw / 2, ty + 54), meta_line, font=meta_font, fill=(156, 152, 142), anchor="mm")
+    meta_font = fitted_font(draw, meta_line, 33, caption_max_w)
+    ty = y + ph + 68
+    draw.text((cw / 2, ty), title, font=title_font, fill=(228, 224, 214), anchor="mm")
+    draw.text((cw / 2, ty + 58), meta_line, font=meta_font, fill=(158, 154, 144), anchor="mm")
 
-    canvas.save(out_path, "JPEG", quality=86, optimize=True)
+    # subsampling=0 (4:4:4): default 4:2:0 chroma smears light serif text
+    # against the dark matte — the single biggest caption-sharpness win.
+    canvas.save(out_path, "JPEG", quality=92, optimize=True, subsampling=0)
 
 
 def make_wallpaper(img, title, artist, year, out_path):
@@ -126,6 +129,26 @@ def make_display(img, out_path, long_edge=1600):
     scale = min(1.0, long_edge / max(img.width, img.height))
     out = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
     out.save(out_path, "JPEG", quality=84, optimize=True)
+
+
+def make_zoom(img, out_path, long_edge=2600):
+    """Highest-resolution variant we serve — for the PWA's fullscreen viewer.
+    Only ever downscales, so it's capped by what the museum gave us."""
+    scale = min(1.0, long_edge / max(img.width, img.height))
+    out = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
+    out.save(out_path, "JPEG", quality=86, optimize=True)
+
+
+def make_home(img, out_path, w, h):
+    """Home-screen variant: the painting aspect-filled edge to edge, no matte
+    or caption. iOS blurs/darkens behind icons anyway; a full-bleed crop
+    reads far better there than a blurred matte composition."""
+    scale = max(w / img.width, h / img.height)
+    fw, fh = round(img.width * scale), round(img.height * scale)
+    out = img.resize((fw, fh), Image.LANCZOS)
+    left, top = (fw - w) // 2, (fh - h) // 2
+    out = out.crop((left, top, left + w, top + h))
+    out.save(out_path, "JPEG", quality=88, optimize=True)
 
 
 def make_icons(img, site_dir):
@@ -160,6 +183,9 @@ def main():
                    os.path.join(args.site_dir, "images", "wall", f"{args.slug}.jpg"))
     make_wallpaper_ipad(img, args.title, args.artist, args.year,
                         os.path.join(args.site_dir, "images", "wall-ipad", f"{args.slug}.jpg"))
+    make_home(img, os.path.join(args.site_dir, "images", "home", f"{args.slug}.jpg"), W, H)
+    make_home(img, os.path.join(args.site_dir, "images", "home-ipad", f"{args.slug}.jpg"), SQ, SQ)
+    make_zoom(img, os.path.join(args.site_dir, "images", "zoom", f"{args.slug}.jpg"))
     make_display(img, os.path.join(args.site_dir, "images", "display", f"{args.slug}.jpg"))
 
 

@@ -28,6 +28,8 @@ const item = items[index];
 await mkdir(path.join(SITE, 'today'), { recursive: true });
 await copyFile(path.join(SITE, item.wallpaper), path.join(SITE, 'today', 'wallpaper.jpg'));
 await copyFile(path.join(SITE, item.wallpaperIpad), path.join(SITE, 'today', 'wallpaper-ipad.jpg'));
+await copyFile(path.join(SITE, item.home), path.join(SITE, 'today', 'home.jpg'));
+await copyFile(path.join(SITE, item.homeIpad), path.join(SITE, 'today', 'home-ipad.jpg'));
 await copyFile(path.join(SITE, item.image), path.join(SITE, 'today', 'image.jpg'));
 
 await writeFile(

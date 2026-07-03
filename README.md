@@ -14,15 +14,17 @@ data/seeds/*.mjs          50 curated works: sources + hand-written lessons
 .cache/originals/         one-time downloads (Met / AIC / Wikimedia Commons)
         │
         ▼  scripts/process_image.py (Pillow)
-site/images/wall/         1640×2360 portrait wallpapers, captioned (iPhone)
-site/images/wall-ipad/    2388×2388 square wallpapers, safe in both iPad orientations
-site/images/display/      ≤1600px images for the PWA
+site/images/wall/         1640×2360 portrait lock wallpapers, captioned (iPhone)
+site/images/wall-ipad/    2420×2420 square lock wallpapers, safe in both iPad orientations
+site/images/home*/        full-bleed home-screen crops (no matte/caption)
+site/images/zoom/         ≤2600px for the PWA's fullscreen viewer
+site/images/display/      ≤1600px inline images for the PWA
 site/artworks.json        the manifest, in rotation order
         │
         ▼  node scripts/today.mjs        (GitHub Actions, daily 00:10 Pacific)
-site/today.json                 today's metadata at a stable URL
-site/today/wallpaper.jpg        today's portrait wallpaper   ← iPhone Shortcut
-site/today/wallpaper-ipad.jpg   today's square wallpaper     ← iPad Shortcut
+site/today.json                    today's metadata at a stable URL
+site/today/wallpaper[-ipad].jpg    today's lock wallpaper   ← Shortcut
+site/today/home[-ipad].jpg         today's home wallpaper   ← Shortcut
 ```
 
 **Deterministic "today":** days since `2026-01-01` (local midnight), modulo 50.

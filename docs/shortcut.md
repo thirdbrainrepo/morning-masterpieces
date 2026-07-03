@@ -3,8 +3,10 @@
 Once the site is deployed, GitHub Actions refreshes these stable URLs just
 after midnight Pacific every day:
 
-- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper.jpg` — portrait 1640×2360, for **iPhone**
-- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper-ipad.jpg` — square 2388×2388, for **iPad**
+- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper.jpg` — portrait 1640×2360 lock screen, for **iPhone**
+- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper-ipad.jpg` — square 2420×2420 lock screen, for **iPad**
+- `https://thirdbrainrepo.github.io/morning-masterpieces/today/home.jpg` — full-bleed **home screen** crop, iPhone
+- `https://thirdbrainrepo.github.io/morning-masterpieces/today/home-ipad.jpg` — full-bleed **home screen** crop, iPad
 - `https://thirdbrainrepo.github.io/morning-masterpieces/today.json` — full metadata for today's work
 
 Why two: an iPad rotates, and iPadOS center-crops a single wallpaper for both
@@ -28,6 +30,30 @@ Open **Shortcuts** → **+** to create a new shortcut named `Morning Masterpiece
    - Choose which wallpaper it targets (your art lock screen — see below).
 3. *(Optional)* **Show Notification** with *Get Dictionary from Input* on
    `today.json` if you want the title/artist to appear when it swaps.
+
+## Home screen too (recommended)
+
+By default iOS pairs the home screen with a blurred copy of the lock screen —
+wasted real estate. The `home` variants are the painting itself, aspect-filled
+edge to edge with no matte or caption (icons sit better over full-bleed art,
+and iOS adds its own legibility treatment). Add two more actions to the same
+shortcut:
+
+4. **Get Contents of URL** → `.../today/home-ipad.jpg` (or `home.jpg` on iPhone)
+5. **Set Wallpaper** — same wallpaper, but target **Home Screen**, with
+   "Show Preview" off.
+
+## If the caption text looks soft
+
+Two things control sharpness, both one-time fixes:
+
+- iOS applies a slight **parallax/perspective zoom** to wallpapers by default,
+  which scales the image and softens fine text. Long-press the lock screen →
+  **Customize** → pinch the image out/in to reset the crop, and disable
+  Perspective Zoom if the option appears.
+- Make sure the Shortcut points at the **iPad** variant on iPad — the square
+  is sized pixel-exact for an 11" iPad Pro panel (2420px), so portrait shows
+  it 1:1 with no upscale.
 
 ## The Automation
 

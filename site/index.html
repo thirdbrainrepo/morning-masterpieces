@@ -32,31 +32,35 @@
       </figcaption>
     </figure>
 
-    <dl class="tombstone">
-      <div><dt>Date</dt><dd id="art-year"></dd></div>
-      <div><dt>Medium</dt><dd id="art-medium"></dd></div>
-      <div><dt>Movement</dt><dd id="art-movement"></dd></div>
-      <div><dt>Collection</dt><dd id="art-museum"></dd></div>
-    </dl>
+    <div class="panel" id="panel">
+      <dl class="tombstone">
+        <div><dt>Date</dt><dd id="art-year"></dd></div>
+        <div><dt>Medium</dt><dd id="art-medium"></dd></div>
+        <div><dt>Movement</dt><dd id="art-movement"></dd></div>
+        <div><dt>Collection</dt><dd id="art-museum"></dd></div>
+      </dl>
 
-    <section class="lesson">
-      <h3 class="section-label">Today’s lesson</h3>
-      <div id="art-lesson"></div>
-    </section>
+      <section class="lesson">
+        <h3 class="section-label">Today’s lesson</h3>
+        <div id="art-lesson"></div>
+      </section>
 
-    <aside class="look-for">
-      <h3 class="section-label">Look closer</h3>
-      <p id="art-lookfor"></p>
-    </aside>
+      <aside class="look-for">
+        <h3 class="section-label">Look closer</h3>
+        <p id="art-lookfor"></p>
+      </aside>
 
-    <nav class="actions">
-      <button id="ask-btn" class="action" type="button">Copy a prompt to ask about this work</button>
-      <a id="museum-link" class="action" target="_blank" rel="noopener">View at the museum&nbsp;→</a>
-      <a id="wallpaper-link" class="action" target="_blank" rel="noopener">Wallpaper · iPhone (portrait)</a>
-      <a id="wallpaper-ipad-link" class="action" target="_blank" rel="noopener">Wallpaper · iPad (rotates)</a>
-    </nav>
+      <nav class="actions">
+        <button id="listen-btn" class="action" type="button">Listen — the docent reads today’s lesson</button>
+        <button id="fullscreen-btn" class="action" type="button">View fullscreen</button>
+        <button id="ask-btn" class="action" type="button">Copy a prompt to ask about this work</button>
+        <a id="museum-link" class="action" target="_blank" rel="noopener">View at the museum&nbsp;→</a>
+        <a id="wallpaper-link" class="action">Download wallpaper · iPhone</a>
+        <a id="wallpaper-ipad-link" class="action">Download wallpaper · iPad</a>
+      </nav>
 
-    <p class="license" id="art-license"></p>
+      <p class="license" id="art-license"></p>
+    </div>
   </main>
 
   <nav class="pager" id="pager" hidden>
@@ -66,6 +70,15 @@
   </nav>
 
   <div class="toast" id="toast" role="status"></div>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <img id="lightbox-img" alt="">
+    <div class="lightbox-bar">
+      <button id="lightbox-listen" type="button">Listen</button>
+      <button id="lightbox-close" type="button" aria-label="Close">✕</button>
+    </div>
+    <p class="rotate-hint" id="rotate-hint" hidden>Rotate your device for a better fit</p>
+  </div>
 
   <footer class="colophon">
     <p>One public-domain masterpiece a day — images courtesy of open-access programs at
