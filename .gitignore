@@ -1,0 +1,7 @@
+.cache/
+.DS_Store
+node_modules/
+
+# Materialized daily by scripts/today.mjs (CI regenerates on deploy)
+site/today.json
+site/today/

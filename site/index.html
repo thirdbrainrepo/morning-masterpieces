@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Morning Masterpieces</title>
+  <meta name="description" content="A daily art history lesson: one public-domain masterpiece per day.">
+  <meta name="theme-color" content="#12100d">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Masterpieces">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <p class="eyebrow" id="dateline">&nbsp;</p>
+    <h1 class="wordmark">Morning Masterpieces</h1>
+    <p class="daycount" id="daycount">&nbsp;</p>
+  </header>
+
+  <main id="main" hidden>
+    <figure class="artwork">
+      <div class="frame">
+        <img id="art-image" alt="" decoding="async">
+      </div>
+      <figcaption>
+        <h2 id="art-title"></h2>
+        <p class="artist-line"><span id="art-artist"></span> <span class="dim" id="art-artist-dates"></span></p>
+      </figcaption>
+    </figure>
+
+    <dl class="tombstone">
+      <div><dt>Date</dt><dd id="art-year"></dd></div>
+      <div><dt>Medium</dt><dd id="art-medium"></dd></div>
+      <div><dt>Movement</dt><dd id="art-movement"></dd></div>
+      <div><dt>Collection</dt><dd id="art-museum"></dd></div>
+    </dl>
+
+    <section class="lesson">
+      <h3 class="section-label">Today’s lesson</h3>
+      <div id="art-lesson"></div>
+    </section>
+
+    <aside class="look-for">
+      <h3 class="section-label">Look closer</h3>
+      <p id="art-lookfor"></p>
+    </aside>
+
+    <nav class="actions">
+      <button id="ask-btn" class="action" type="button">Copy a prompt to ask about this work</button>
+      <a id="museum-link" class="action" target="_blank" rel="noopener">View at the museum&nbsp;→</a>
+      <a id="wallpaper-link" class="action" target="_blank" rel="noopener">Open today’s wallpaper</a>
+    </nav>
+
+    <p class="license" id="art-license"></p>
+  </main>
+
+  <nav class="pager" id="pager" hidden>
+    <button id="prev-btn" type="button" aria-label="Previous day">‹</button>
+    <button id="today-btn" type="button">Today</button>
+    <button id="next-btn" type="button" aria-label="Next day">›</button>
+  </nav>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <footer class="colophon">
+    <p>One public-domain masterpiece a day — images courtesy of open-access programs at
+    The Met, the Art Institute of Chicago, and Wikimedia Commons.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
