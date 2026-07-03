@@ -199,6 +199,7 @@ figcaption h2 {
   border-top: 1px solid var(--hairline);
   padding-top: 1.4rem;
 }
+.colophon a { color: var(--ink-dim); }
 
 /* ── Fullscreen art viewer ─────────────────────────────────────── */
 .lightbox {

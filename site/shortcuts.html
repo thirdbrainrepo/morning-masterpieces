@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Shortcuts — Morning Masterpieces</title>
+  <meta name="description" content="Set up daily art wallpapers and the spoken docent with iOS Shortcuts — copy-paste blurbs for Siri, or build them by hand.">
+  <meta name="theme-color" content="#12100d">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <style>
+    :root {
+      --wall: #12100d; --wall-raised: #1a1713; --ink: #e8e3d8; --ink-dim: #a49c8c;
+      --ink-faint: #6e675b; --hairline: #2e2a24; --accent: #c8a96e;
+      --serif: 'Palatino', 'Georgia', 'Times New Roman', serif;
+      --sans: -apple-system, system-ui, sans-serif;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: var(--wall); color: var(--ink); font-family: var(--serif);
+      line-height: 1.65; max-width: 720px; margin: 0 auto;
+      padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 3rem);
+    }
+    .eyebrow, h2 .label {
+      font-family: var(--sans); font-size: 0.72rem; font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-faint);
+    }
+    header { text-align: center; margin-bottom: 2.2rem; }
+    h1 { font-size: 1.55rem; font-weight: 500; font-style: italic; color: var(--accent); margin: 0.35rem 0; }
+    .lede { color: var(--ink-dim); font-size: 1.02rem; max-width: 560px; margin: 0.6rem auto 0; }
+    .back {
+      display: inline-block; font-family: var(--sans); font-size: 0.85rem;
+      color: var(--ink-dim); text-decoration: none; border: 1px solid var(--hairline);
+      border-radius: 999px; padding: 0.45rem 1rem; margin-bottom: 1.6rem;
+    }
+    .back:hover { border-color: var(--accent); color: var(--ink); }
+    h2 {
+      font-size: 1.35rem; font-weight: 500; font-style: italic;
+      margin: 2.6rem 0 0.4rem; color: var(--ink);
+    }
+    h2 .label { display: block; font-style: normal; margin-bottom: 0.3rem; color: var(--accent); }
+    p, li { font-size: 1.02rem; margin-bottom: 0.8rem; color: var(--ink-dim); }
+    strong { color: var(--ink); font-weight: 600; }
+    ol, ul { padding-left: 1.4rem; margin-bottom: 1rem; }
+    li { margin-bottom: 0.45rem; }
+    code {
+      font-family: ui-monospace, Menlo, monospace; font-size: 0.85em;
+      background: var(--wall-raised); border: 1px solid var(--hairline);
+      border-radius: 4px; padding: 0.1em 0.4em; word-break: break-all;
+    }
+    .blurb {
+      position: relative; background: var(--wall-raised);
+      border: 1px solid var(--hairline); border-left: 2px solid var(--accent);
+      border-radius: 6px; padding: 1.1rem 1.2rem 1.2rem; margin: 1rem 0 1.4rem;
+    }
+    .blurb p {
+      font-family: var(--sans); font-size: 0.92rem; line-height: 1.6;
+      color: var(--ink-dim); margin: 0; user-select: all; -webkit-user-select: all;
+    }
+    .copy-btn {
+      display: block; width: 100%; margin-top: 1rem;
+      font-family: var(--sans); font-size: 0.85rem; font-weight: 600;
+      color: var(--accent); background: none; border: 1px solid var(--hairline);
+      border-radius: 8px; padding: 0.65rem 1rem; cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .copy-btn:hover, .copy-btn:active { border-color: var(--accent); }
+    details {
+      border: 1px solid var(--hairline); border-radius: 6px;
+      padding: 0.8rem 1.1rem; margin-bottom: 1rem;
+    }
+    summary {
+      font-family: var(--sans); font-size: 0.88rem; font-weight: 600;
+      color: var(--ink-dim); cursor: pointer;
+    }
+    details[open] summary { margin-bottom: 0.8rem; }
+    .callout {
+      border-left: 2px solid var(--accent); background: var(--wall-raised);
+      padding: 1rem 1.2rem; margin: 1.4rem 0;
+    }
+    .callout p:last-child { margin-bottom: 0; }
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.4rem; font-size: 0.92rem; }
+    th, td { text-align: left; padding: 0.5rem 0.6rem 0.5rem 0; border-bottom: 1px solid var(--hairline); vertical-align: top; }
+    th { font-family: var(--sans); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+    td { color: var(--ink-dim); }
+    footer { text-align: center; border-top: 1px solid var(--hairline); margin-top: 3rem; padding-top: 1.4rem; }
+    footer p { font-size: 0.8rem; color: var(--ink-faint); }
+    .toast {
+      position: fixed; bottom: calc(env(safe-area-inset-bottom) + 1.5rem); left: 50%;
+      transform: translateX(-50%) translateY(10px); background: var(--accent); color: #1a1408;
+      font-family: var(--sans); font-size: 0.85rem; font-weight: 600;
+      padding: 0.6rem 1.2rem; border-radius: 8px; opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">Automation guide</p>
+    <h1>Morning Masterpieces — Shortcuts</h1>
+    <p class="lede">A new masterpiece on your lock screen every morning, and a docent you can
+    summon with your voice. Two ways to build each shortcut: <strong>ask Siri</strong> — copy a
+    blurb below and read or paste it to Siri in the Shortcuts app — or follow the manual steps.</p>
+  </header>
+
+  <a class="back" href="./">← Back to the gallery</a>
+
+  <div class="callout">
+    <p><strong>One-time setup, before anything else:</strong> the daily wallpaper needs a
+    dedicated wallpaper slot to overwrite. Long-press your lock screen → <strong>+</strong> →
+    create a plain <strong>Photo</strong> wallpaper from any image (name it — e.g.
+    “Masterpiece”). It must be a Photo wallpaper, <em>not</em> Photo Shuffle: Shortcuts can’t
+    modify a Shuffle wallpaper. The blurbs below call it “Masterpiece” — swap in whatever
+    yours is named.</p>
+  </div>
+
+  <h2><span class="label">Shortcut 1 · iPad</span>Daily wallpapers, lock &amp; home</h2>
+  <p>Swaps both screens each morning: the matted, captioned composition on the lock screen,
+  the painting edge-to-edge behind your icons.</p>
+  <div class="blurb">
+    <p id="blurb-ipad">Create a new shortcut named "Morning Masterpiece" with exactly four actions. Action 1: "Get Contents of URL" fetching https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper-ipad.jpg as a GET request. Action 2: "Set Wallpaper" using the output of action 1 as the image, targeting the Lock Screen of my wallpaper named "Masterpiece", with the "Show Preview" option turned off. Action 3: "Get Contents of URL" fetching https://thirdbrainrepo.github.io/morning-masterpieces/today/home-ipad.jpg as a GET request. Action 4: "Set Wallpaper" using the output of action 3 as the image, targeting the Home Screen of that same wallpaper, with "Show Preview" turned off. Then create a personal automation that runs this shortcut daily at 6:00 AM, set to "Run Immediately" with Notify turned off.</p>
+    <button class="copy-btn" data-copy="blurb-ipad" type="button">Copy blurb for Siri</button>
+  </div>
+  <details>
+    <summary>Build it by hand instead</summary>
+    <ol>
+      <li>Shortcuts → <strong>+</strong> → name it <em>Morning Masterpiece</em>.</li>
+      <li><strong>Get Contents of URL</strong> → <code>https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper-ipad.jpg</code></li>
+      <li><strong>Set Wallpaper</strong> → image: <em>Contents of URL</em> → pick your art wallpaper → <strong>Lock Screen</strong> → expand the action’s options and turn <strong>Show Preview OFF</strong>.</li>
+      <li><strong>Get Contents of URL</strong> → <code>…/today/home-ipad.jpg</code></li>
+      <li><strong>Set Wallpaper</strong> → image: output of step 4 → same wallpaper → <strong>Home Screen</strong> → Show Preview OFF.</li>
+      <li>Automation tab → <strong>+</strong> → <strong>Time of Day</strong> → 6:00 AM, Daily → <strong>Run Immediately</strong> → run <em>Morning Masterpiece</em>.</li>
+    </ol>
+  </details>
+
+  <h2><span class="label">Shortcut 2 · iPhone</span>Daily wallpapers, lock &amp; home</h2>
+  <p>Identical to the iPad version — only the image URLs differ (portrait-sized files).</p>
+  <div class="blurb">
+    <p id="blurb-iphone">Create a new shortcut named "Morning Masterpiece" with exactly four actions. Action 1: "Get Contents of URL" fetching https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper.jpg as a GET request. Action 2: "Set Wallpaper" using the output of action 1 as the image, targeting the Lock Screen of my wallpaper named "Masterpiece", with the "Show Preview" option turned off. Action 3: "Get Contents of URL" fetching https://thirdbrainrepo.github.io/morning-masterpieces/today/home.jpg as a GET request. Action 4: "Set Wallpaper" using the output of action 3 as the image, targeting the Home Screen of that same wallpaper, with "Show Preview" turned off. Then create a personal automation that runs this shortcut daily at 6:00 AM, set to "Run Immediately" with Notify turned off.</p>
+    <button class="copy-btn" data-copy="blurb-iphone" type="button">Copy blurb for Siri</button>
+  </div>
+  <details>
+    <summary>Build it by hand instead</summary>
+    <ol>
+      <li>Same six steps as the iPad recipe, with these URLs:
+        <code>…/today/wallpaper.jpg</code> for the lock screen and
+        <code>…/today/home.jpg</code> for the home screen.</li>
+    </ol>
+  </details>
+
+  <h2><span class="label">Shortcut 3 · any device</span>“Hey Siri, Art Docent”</h2>
+  <p>Opens the artwork fullscreen and reads today’s lesson aloud in the Siri voice —
+  including the advanced expressive voice on devices that have it.</p>
+  <div class="blurb">
+    <p id="blurb-docent">Create a new shortcut named "Art Docent". Action 1: "Get Contents of URL" fetching https://thirdbrainrepo.github.io/morning-masterpieces/today.json. Action 2: "Get Dictionary Value" for key path "item.title" from the contents. Action 3: "Get Dictionary Value" for key path "item.artist". Action 4: "Get Dictionary Value" for key path "item.lesson". Action 5: "Get Dictionary Value" for key path "item.lookFor". Action 6: "Open URL" opening https://thirdbrainrepo.github.io/morning-masterpieces/?view=full. Action 7: "Wait" 2 seconds. Action 8: a "Text" action composing: the title, followed by ", by ", the artist, then a period, then the lesson, then " Look closer: " and the lookFor value. Action 9: "Speak Text" speaking that composed text aloud, with "Wait Until Finished" turned on.</p>
+    <button class="copy-btn" data-copy="blurb-docent" type="button">Copy blurb for Siri</button>
+  </div>
+  <details>
+    <summary>Build it by hand instead</summary>
+    <ol>
+      <li><strong>Get Contents of URL</strong> → <code>https://thirdbrainrepo.github.io/morning-masterpieces/today.json</code></li>
+      <li><strong>Get Dictionary Value</strong> ×4 → key paths <code>item.title</code>, <code>item.artist</code>, <code>item.lesson</code>, <code>item.lookFor</code>.</li>
+      <li><strong>Open URL</strong> → <code>https://thirdbrainrepo.github.io/morning-masterpieces/?view=full</code> (the gallery opens straight into the fullscreen artwork).</li>
+      <li><strong>Wait</strong> → 2 seconds.</li>
+      <li><strong>Text</strong> → <em>[title]</em>, by <em>[artist]</em>. <em>[lesson]</em> Look closer: <em>[lookFor]</em></li>
+      <li><strong>Speak Text</strong> → the Text variable → turn <strong>Wait Until Finished ON</strong>. Pick the voice and rate in this action’s options.</li>
+    </ol>
+  </details>
+
+  <h2><span class="label">Shortcut 4 · audio only</span>Art Docent Audio</h2>
+  <p>The same spoken lesson without taking over the screen — right for HomePod morning
+  automations or listening while you work.</p>
+  <div class="blurb">
+    <p id="blurb-audio">Create a new shortcut named "Art Docent Audio". Action 1: "Get Contents of URL" fetching https://thirdbrainrepo.github.io/morning-masterpieces/today.json. Action 2: "Get Dictionary Value" for key path "item.title" from the contents. Action 3: "Get Dictionary Value" for key path "item.artist". Action 4: "Get Dictionary Value" for key path "item.lesson". Action 5: "Get Dictionary Value" for key path "item.lookFor". Action 6: a "Text" action composing: the title, followed by ", by ", the artist, then a period, then the lesson, then " Look closer: " and the lookFor value. Action 7: "Speak Text" speaking that composed text aloud, with "Wait Until Finished" turned on.</p>
+    <button class="copy-btn" data-copy="blurb-audio" type="button">Copy blurb for Siri</button>
+  </div>
+
+  <div class="callout">
+    <p><strong>After Siri builds a shortcut, check the two things it most often gets wrong:</strong></p>
+    <ul>
+      <li>Every <strong>Set Wallpaper</strong> action must have <strong>Show Preview OFF</strong> — otherwise iOS asks for confirmation every morning and the automation stalls.</li>
+      <li>The automation must be <strong>Run Immediately</strong>, not “Ask Before Running.”</li>
+    </ul>
+    <p>Then run the shortcut manually once — iOS asks one-time permission to reach this site
+    and to set wallpapers. After that it’s fully hands-off.</p>
+  </div>
+
+  <h2><span class="label">Reference</span>Stable daily endpoints</h2>
+  <p>Everything refreshes just after midnight Pacific. Build anything you like on these:</p>
+  <table>
+    <tr><th>URL</th><th>What it is</th></tr>
+    <tr><td><code>today/wallpaper.jpg</code></td><td>Lock screen, portrait (iPhone)</td></tr>
+    <tr><td><code>today/wallpaper-ipad.jpg</code></td><td>Lock screen, square — safe in both iPad orientations</td></tr>
+    <tr><td><code>today/home.jpg</code> · <code>today/home-ipad.jpg</code></td><td>Home screen, painting edge-to-edge</td></tr>
+    <tr><td><code>today/image.jpg</code></td><td>The painting itself, display resolution</td></tr>
+    <tr><td><code>today.json</code></td><td>All metadata + the full lesson text</td></tr>
+    <tr><td><code>/?view=full</code></td><td>The gallery, opening straight into fullscreen art</td></tr>
+  </table>
+
+  <a class="back" href="./">← Back to the gallery</a>
+
+  <footer>
+    <p>Morning Masterpieces — a daily art history lesson from the public domain.</p>
+  </footer>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    function toast(msg) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.classList.add('show');
+      setTimeout(() => el.classList.remove('show'), 2400);
+    }
+    for (const btn of document.querySelectorAll('.copy-btn')) {
+      btn.addEventListener('click', async () => {
+        const blurb = document.getElementById(btn.dataset.copy);
+        try {
+          await navigator.clipboard.writeText(blurb.textContent);
+          toast('Copied — paste it to Siri in the Shortcuts app');
+        } catch {
+          // Clipboard API unavailable: select the blurb so a manual copy works.
+          const range = document.createRange();
+          range.selectNodeContents(blurb);
+          const sel = getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          toast(document.execCommand('copy')
+            ? 'Copied — paste it to Siri in the Shortcuts app'
+            : 'Blurb selected — copy it manually');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

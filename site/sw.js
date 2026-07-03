@@ -5,8 +5,8 @@
 // the background (daily CI, occasional layout fixes), and a cache-first
 // shell would pin every installed PWA to whatever version it first saw.
 
-const VERSION = 'mm-v2';
-const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest'];
+const VERSION = 'mm-v3';
+const SHELL = ['./', 'index.html', 'shortcuts.html', 'styles.css', 'app.js', 'manifest.webmanifest'];
 const IMAGE_CACHE = `${VERSION}-images`;
 const IMAGE_LIMIT = 80;
 
