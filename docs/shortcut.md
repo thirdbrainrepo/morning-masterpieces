@@ -1,10 +1,16 @@
 # iOS Shortcut: daily lock-screen masterpiece
 
-Once the site is deployed, GitHub Actions refreshes two stable URLs just after
-midnight Pacific every day:
+Once the site is deployed, GitHub Actions refreshes these stable URLs just
+after midnight Pacific every day:
 
-- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper.jpg` — the composed 1640×2360 wallpaper
+- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper.jpg` — portrait 1640×2360, for **iPhone**
+- `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper-ipad.jpg` — square 2388×2388, for **iPad**
 - `https://thirdbrainrepo.github.io/morning-masterpieces/today.json` — full metadata for today's work
+
+Why two: an iPad rotates, and iPadOS center-crops a single wallpaper for both
+orientations. The square variant keeps the painting and caption inside the
+central region that survives both crops, so nothing is ever cut off no matter
+how the iPad is held. On iPhone the portrait variant fills edge to edge.
 
 Because "today" is materialized server-side, the Shortcut needs only **three
 actions** and zero logic.
@@ -14,7 +20,8 @@ actions** and zero logic.
 Open **Shortcuts** → **+** to create a new shortcut named `Morning Masterpiece`:
 
 1. **Get Contents of URL**
-   `https://thirdbrainrepo.github.io/morning-masterpieces/today/wallpaper.jpg`
+   `.../today/wallpaper-ipad.jpg` on iPad, `.../today/wallpaper.jpg` on iPhone
+   (full URLs above)
 2. **Set Wallpaper** — set input to the *Contents of URL* variable.
    - Tap the arrow on the action and **turn OFF "Show Preview"** — otherwise
      iOS pops a confirmation dialog every morning and the automation stalls.

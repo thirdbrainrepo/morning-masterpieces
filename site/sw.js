@@ -1,7 +1,11 @@
-// Service worker: cache-first app shell, network-first manifest,
-// runtime-cached artwork images (capped).
+// Service worker: network-first app shell and manifest (always fresh online,
+// cached copy as offline fallback), cache-first artwork images (capped).
+//
+// The shell is deliberately NOT cache-first: this site deploys silently in
+// the background (daily CI, occasional layout fixes), and a cache-first
+// shell would pin every installed PWA to whatever version it first saw.
 
-const VERSION = 'mm-v1';
+const VERSION = 'mm-v2';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'manifest.webmanifest'];
 const IMAGE_CACHE = `${VERSION}-images`;
 const IMAGE_LIMIT = 80;
@@ -30,21 +34,9 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
 
-  // Manifest: network-first so a new rotation lands promptly.
-  if (url.pathname.endsWith('artworks.json') || url.pathname.endsWith('today.json')) {
-    event.respondWith(
-      fetch(event.request)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(VERSION).then((c) => c.put(event.request, copy));
-          return res;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // Images: cache-first with a capped runtime cache.
+  // Artwork images: cache-first with a capped runtime cache. These are
+  // content-stable (a slug's image never changes), so staleness can't bite.
+  // NOT /today/ — those paths change content daily under the same URL.
   if (url.pathname.includes('/images/')) {
     event.respondWith(
       caches.match(event.request).then(
@@ -63,8 +55,15 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Shell: cache-first.
+  // Everything else (shell, artworks.json, today.json): network-first,
+  // falling back to the last cached copy when offline.
   event.respondWith(
-    caches.match(event.request).then((hit) => hit || fetch(event.request))
+    fetch(event.request)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(VERSION).then((c) => c.put(event.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(event.request))
   );
 });

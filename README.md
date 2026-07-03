@@ -14,13 +14,15 @@ data/seeds/*.mjs          50 curated works: sources + hand-written lessons
 .cache/originals/         one-time downloads (Met / AIC / Wikimedia Commons)
         │
         ▼  scripts/process_image.py (Pillow)
-site/images/wall/         1640×2360 matted lock-screen wallpapers (captioned)
+site/images/wall/         1640×2360 portrait wallpapers, captioned (iPhone)
+site/images/wall-ipad/    2388×2388 square wallpapers, safe in both iPad orientations
 site/images/display/      ≤1600px images for the PWA
 site/artworks.json        the manifest, in rotation order
         │
         ▼  node scripts/today.mjs        (GitHub Actions, daily 00:10 Pacific)
-site/today.json           today's metadata at a stable URL
-site/today/wallpaper.jpg  today's wallpaper at a stable URL  ← the Shortcut
+site/today.json                 today's metadata at a stable URL
+site/today/wallpaper.jpg        today's portrait wallpaper   ← iPhone Shortcut
+site/today/wallpaper-ipad.jpg   today's square wallpaper     ← iPad Shortcut
 ```
 
 **Deterministic "today":** days since `2026-01-01` (local midnight), modulo 50.
@@ -38,7 +40,9 @@ so a wrong object ID fails loudly instead of shipping the wrong painting.
 dark wall tinted from the painting's own palette, positioned below the iOS
 lock-screen clock zone, with a drop shadow, hairline frame, and serif caption
 (title / artist / year) — so the lock screen is self-describing and Siri's
-screen awareness has text to read.
+screen awareness has text to read. Two variants: portrait (phones) and a
+square iPad build whose art zone survives iPadOS's center-crop in *both*
+orientations, since iPads rotate and one wallpaper must serve both.
 
 ## Commands
 

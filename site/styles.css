@@ -194,3 +194,82 @@ figcaption h2 {
   border-top: 1px solid var(--hairline);
   padding-top: 1.4rem;
 }
+
+/* ── Wide viewports (iPad landscape, desktop): two-column gallery.
+      Painting hangs sticky on the left; the lesson scrolls beside it.
+      The floating pager pill becomes edge chevrons so nothing overlaps. */
+@media (min-width: 960px) {
+  body {
+    max-width: 1200px;
+    padding-left: 4.5rem;
+    padding-right: 4.5rem;
+    padding-bottom: 3rem;
+  }
+
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 11fr) minmax(0, 9fr);
+    column-gap: 3rem;
+    align-items: start;
+  }
+
+  .artwork {
+    grid-column: 1;
+    grid-row: 1 / span 9;
+    position: sticky;
+    top: 1.2rem;
+    margin-bottom: 0;
+  }
+
+  .tombstone, .lesson, .look-for, .actions, .license { grid-column: 2; }
+
+  .frame { display: flex; justify-content: center; }
+  .frame img {
+    width: auto;
+    max-width: 100%;
+    max-height: calc(100vh - 16rem);
+  }
+
+  .pager {
+    position: static;
+    /* transform/backdrop-filter would become the containing block for the
+       fixed-position buttons below — reset both. */
+    transform: none;
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .pager button {
+    position: fixed;
+    z-index: 10;
+    background: rgba(26, 23, 19, 0.85);
+    border: 1px solid var(--hairline);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+  }
+
+  #prev-btn, #next-btn {
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1.4rem;
+    line-height: 1;
+    padding: 1.1rem 0.8rem;
+  }
+  #prev-btn { left: max(env(safe-area-inset-left), 10px); }
+  #next-btn { right: max(env(safe-area-inset-right), 10px); }
+
+  #today-btn {
+    top: max(env(safe-area-inset-top), 12px);
+    right: max(env(safe-area-inset-right), 14px);
+    padding: 0.55rem 1.1rem;
+  }
+
+  .toast {
+    bottom: auto;
+    top: calc(env(safe-area-inset-top) + 4.5rem);
+  }
+}

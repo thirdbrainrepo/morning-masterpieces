@@ -56,6 +56,7 @@ function render() {
 
   $('museum-link').href = item.objectUrl;
   $('wallpaper-link').href = item.wallpaper;
+  $('wallpaper-ipad-link').href = item.wallpaperIpad;
   $('art-license').textContent = `Image: ${item.license}`;
 
   $('today-btn').style.visibility = offset === 0 ? 'hidden' : 'visible';

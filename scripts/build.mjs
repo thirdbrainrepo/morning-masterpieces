@@ -5,9 +5,10 @@
 //   1. Resolve the source (Met / AIC / Wikimedia Commons), enforcing the
 //      museum's own public-domain flag where the API provides one.
 //   2. Download the original image once into .cache/originals/ (gitignored).
-//   3. Compose the two derived variants via scripts/process_image.py:
-//        site/images/wall/<slug>.jpg    1640x2360 matted lock-screen wallpaper
-//        site/images/display/<slug>.jpg <=1600px display image for the PWA
+//   3. Compose the derived variants via scripts/process_image.py:
+//        site/images/wall/<slug>.jpg      1640x2360 portrait lock-screen wallpaper
+//        site/images/wall-ipad/<slug>.jpg 2388x2388 square, safe for both iPad orientations
+//        site/images/display/<slug>.jpg   <=1600px display image for the PWA
 //   4. Emit site/artworks.json in seed order (chronological survey arc).
 //
 // Usage: node scripts/build.mjs [--force] [--verify-only]
@@ -155,8 +156,9 @@ async function download(url, dest) {
 
 async function processImages(seed, original) {
   const wall = path.join(SITE, 'images', 'wall', `${seed.slug}.jpg`);
+  const wallIpad = path.join(SITE, 'images', 'wall-ipad', `${seed.slug}.jpg`);
   const display = path.join(SITE, 'images', 'display', `${seed.slug}.jpg`);
-  if (existsSync(wall) && existsSync(display) && !FORCE) return 'cached';
+  if (existsSync(wall) && existsSync(wallIpad) && existsSync(display) && !FORCE) return 'cached';
   await run(PYTHON, [
     PROCESS, original, SITE, seed.slug,
     '--title', seed.title, '--artist', seed.artist, '--year', seed.year,
@@ -180,6 +182,7 @@ async function mapLimit(items, limit, fn) {
 async function main() {
   await mkdir(CACHE, { recursive: true });
   await mkdir(path.join(SITE, 'images', 'wall'), { recursive: true });
+  await mkdir(path.join(SITE, 'images', 'wall-ipad'), { recursive: true });
   await mkdir(path.join(SITE, 'images', 'display'), { recursive: true });
   await mkdir(path.join(SITE, 'icons'), { recursive: true });
   if (!VERIFY_ONLY) PYTHON = await detectPython();
@@ -251,6 +254,7 @@ async function main() {
     license: resolved.license,
     image: `images/display/${seed.slug}.jpg`,
     wallpaper: `images/wall/${seed.slug}.jpg`,
+    wallpaperIpad: `images/wall-ipad/${seed.slug}.jpg`,
     lesson: seed.lesson.trim(),
     lookFor: seed.lookFor.trim(),
   }));

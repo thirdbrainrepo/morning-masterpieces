@@ -7,6 +7,12 @@ hairline frame, and a small serif caption underneath. The full painting is
 always visible -- no cropping -- so landscape works survive the portrait
 lock screen intact.
 
+iPad wallpaper (2388x2388 square): iPads rotate, and iPadOS center-crops a
+single wallpaper for both orientations -- portrait shows the middle column,
+landscape the middle band. The painting and caption are composed inside the
+central region that survives BOTH crops (and sits below the clock zone of
+either orientation), so nothing is cut off no matter how the iPad is held.
+
 Display (<=1600px long edge): plain resize for the PWA.
 
 Icon mode (--icon): square center-crop PNGs for the web app manifest.
@@ -20,10 +26,19 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 Image.MAX_IMAGE_PIXELS = None  # museum scans can exceed Pillow's bomb limit
 
-W, H = 1640, 2360               # iPad portrait lock screen
+W, H = 1640, 2360               # portrait lock screen (phone / pinned iPad)
 ART_MAX_W = int(W * 0.865)      # 1418
 ART_MAX_H = int(H * 0.68)       # 1604
 ART_CENTER_Y = int(H * 0.560)   # painting sits below the clock zone
+
+# Square iPad canvas: 11" iPad Pro is 2388x1668. Portrait crop shows the
+# central 1668-wide column; landscape shows the central 1668-tall band with
+# the clock over its top ~340px. The art box below keeps painting + caption
+# inside the intersection of both visible regions, clear of both clocks.
+SQ = 2388
+SQ_ART_MAX_W = 1500             # within the 1668 portrait column, with margin
+SQ_ART_MAX_H = 1050             # landscape band minus clock zone and caption
+SQ_ART_CENTER_Y = 1310
 
 FONT_CANDIDATES = [
     "/System/Library/Fonts/Supplemental/Georgia.ttf",
@@ -60,22 +75,23 @@ def wall_color(img):
     return tuple(min(255, int(c * k)) for c in (r, g, b))
 
 
-def make_wallpaper(img, title, artist, year, out_path):
+def compose(img, title, artist, year, out_path,
+            cw, ch, art_max_w, art_max_h, art_center_y, caption_max_w):
     bg = wall_color(img)
-    canvas = Image.new("RGB", (W, H), bg)
+    canvas = Image.new("RGB", (cw, ch), bg)
 
     # Gentle top-lit gradient, like gallery lighting.
-    mask = Image.new("L", (1, H))
-    mask.putdata([int(16 * (1 - y / H) ** 2) for y in range(H)])
-    white = Image.new("RGB", (W, H), (255, 255, 255))
-    canvas = Image.composite(white, canvas, mask.resize((W, H)))
+    mask = Image.new("L", (1, ch))
+    mask.putdata([int(16 * (1 - y / ch) ** 2) for y in range(ch)])
+    white = Image.new("RGB", (cw, ch), (255, 255, 255))
+    canvas = Image.composite(white, canvas, mask.resize((cw, ch)))
 
-    scale = min(ART_MAX_W / img.width, ART_MAX_H / img.height)
+    scale = min(art_max_w / img.width, art_max_h / img.height)
     pw, ph = round(img.width * scale), round(img.height * scale)
     art = img.resize((pw, ph), Image.LANCZOS)
-    x, y = W // 2 - pw // 2, ART_CENTER_Y - ph // 2
+    x, y = cw // 2 - pw // 2, art_center_y - ph // 2
 
-    shadow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    shadow = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
     ImageDraw.Draw(shadow).rectangle([x, y + 20, x + pw, y + ph + 20], fill=(0, 0, 0, 150))
     shadow = shadow.filter(ImageFilter.GaussianBlur(36))
     canvas = Image.alpha_composite(canvas.convert("RGBA"), shadow).convert("RGB")
@@ -85,14 +101,25 @@ def make_wallpaper(img, title, artist, year, out_path):
     ImageDraw.Draw(canvas).rectangle([x - 1, y - 1, x + pw, y + ph], outline=hairline)
 
     draw = ImageDraw.Draw(canvas)
-    title_font = fitted_font(draw, title, 42, W - 220)
+    title_font = fitted_font(draw, title, 42, caption_max_w)
     meta_line = f"{artist}  ·  {year}"
-    meta_font = fitted_font(draw, meta_line, 30, W - 220)
+    meta_font = fitted_font(draw, meta_line, 30, caption_max_w)
     ty = y + ph + 66
-    draw.text((W / 2, ty), title, font=title_font, fill=(226, 222, 212), anchor="mm")
-    draw.text((W / 2, ty + 54), meta_line, font=meta_font, fill=(156, 152, 142), anchor="mm")
+    draw.text((cw / 2, ty), title, font=title_font, fill=(226, 222, 212), anchor="mm")
+    draw.text((cw / 2, ty + 54), meta_line, font=meta_font, fill=(156, 152, 142), anchor="mm")
 
     canvas.save(out_path, "JPEG", quality=86, optimize=True)
+
+
+def make_wallpaper(img, title, artist, year, out_path):
+    compose(img, title, artist, year, out_path,
+            W, H, ART_MAX_W, ART_MAX_H, ART_CENTER_Y, caption_max_w=W - 220)
+
+
+def make_wallpaper_ipad(img, title, artist, year, out_path):
+    # Caption must also survive the portrait crop's central column (1668 wide).
+    compose(img, title, artist, year, out_path,
+            SQ, SQ, SQ_ART_MAX_W, SQ_ART_MAX_H, SQ_ART_CENTER_Y, caption_max_w=1500)
 
 
 def make_display(img, out_path, long_edge=1600):
@@ -131,6 +158,8 @@ def main():
 
     make_wallpaper(img, args.title, args.artist, args.year,
                    os.path.join(args.site_dir, "images", "wall", f"{args.slug}.jpg"))
+    make_wallpaper_ipad(img, args.title, args.artist, args.year,
+                        os.path.join(args.site_dir, "images", "wall-ipad", f"{args.slug}.jpg"))
     make_display(img, os.path.join(args.site_dir, "images", "display", f"{args.slug}.jpg"))
 
 
