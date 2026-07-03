@@ -13,6 +13,10 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Explicit author styles (e.g. .lightbox { display: flex }) override the
+   browser's built-in [hidden] rule — restore hidden's authority globally. */
+[hidden] { display: none !important; }
+
 html { -webkit-text-size-adjust: 100%; }
 
 body {
