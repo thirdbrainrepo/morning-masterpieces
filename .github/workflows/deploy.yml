@@ -38,8 +38,11 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
         continue-on-error: true
-      # Pages deployment intermittently fails with "try again later";
-      # since the cron runs unattended overnight, retry once before failing.
+      # Pages deployment intermittently fails with "try again later"; an
+      # immediate retry tends to hit the same transient state, so cool down
+      # first. The cron runs unattended overnight — it must self-heal.
+      - if: steps.deployment.outcome == 'failure'
+        run: sleep 120
       - id: deployment-retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
