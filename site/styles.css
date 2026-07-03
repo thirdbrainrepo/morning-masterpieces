@@ -24,7 +24,7 @@ body {
   color: var(--ink);
   font-family: var(--serif);
   line-height: 1.65;
-  padding: max(env(safe-area-inset-top), 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 7rem);
+  padding: calc(env(safe-area-inset-top) + 1.25rem) 1.25rem calc(env(safe-area-inset-bottom) + 7rem);
   max-width: 720px;
   margin: 0 auto;
 }
@@ -265,7 +265,8 @@ body.lightbox-open { overflow: hidden; }
     display: flex;
     flex-direction: column;
     max-width: 1240px;
-    padding: 1.2rem 4.5rem 0;
+    /* keep clear of the iPadOS status/menu bar in standalone mode */
+    padding: calc(env(safe-area-inset-top) + 1rem) 4.5rem 0;
   }
 
   .masthead { flex: none; margin-bottom: 1.2rem; }
@@ -340,7 +341,7 @@ body.lightbox-open { overflow: hidden; }
   #next-btn { right: max(env(safe-area-inset-right), 10px); }
 
   #today-btn {
-    top: max(env(safe-area-inset-top), 12px);
+    top: calc(env(safe-area-inset-top) + 10px);
     right: max(env(safe-area-inset-right), 14px);
     padding: 0.55rem 1.1rem;
   }
