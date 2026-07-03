@@ -95,10 +95,39 @@ Shortcut can compute the index itself:
 
 The three-action version is better. Use this only as a fallback.
 
-## Siri / Apple Intelligence
+## "Hey Siri, art docent" — spoken lesson via Shortcut
+
+`today.json` carries the full lesson text, and the Shortcuts **Speak Text**
+action uses the system Siri voice — including the advanced expressive voice
+on devices that have it (the same one HomePod intercom automations use).
+That makes a voice-triggered docent a ~5-action shortcut, no code:
+
+1. **Get Contents of URL** → `https://thirdbrainrepo.github.io/morning-masterpieces/today.json`
+2. **Get Dictionary Value** → `item` (then values from it: `title`, `artist`, `lesson`, `lookFor`)
+3. **Text** → compose: `[title], by [artist]. [lesson] Look closer: [lookFor]`
+4. *(Optional, for the visual)* **Open URL** →
+   `https://thirdbrainrepo.github.io/morning-masterpieces/?view=full` — the
+   PWA opens straight into the fullscreen artwork (the `view=full` deep link
+   exists for exactly this), or **Open App** → Masterpieces if installed.
+5. **Speak Text** → the composed text. Pick voice/rate in the action's options.
+
+Name it `Art Docent` and "Hey Siri, Art Docent" does the rest. Works
+anywhere Shortcuts runs — including spoken through a HomePod by adding it
+to a morning automation.
+
+## Wall display / e-paper
+
+Everything a dedicated display needs is a stable URL, refreshed daily:
+
+- `today/image.jpg` — the painting itself (display resolution)
+- `today/wallpaper-ipad.jpg` — the matted, captioned composition
+- `today.json` — all metadata + lesson text
+- `/?view=full` — the PWA in fullscreen-art mode, for anything that renders a browser
+- `audio/<slug>.m4a` — the pre-rendered docent narration (slug from `today.json`)
+
+## Siri / Apple Intelligence screen awareness
 
 With iOS 26/27 on-screen awareness, "What can you tell me about my lock
 screen?" works directly since the wallpaper carries the title and artist in
 its caption. For richer context, the PWA's **Copy a prompt** button builds a
-fully-specified question about today's work, and `today.json` is a stable,
-agent-readable endpoint for anything else you want to wire up.
+fully-specified question about today's work.

@@ -84,6 +84,31 @@ function toast(msg) {
   setTimeout(() => el.classList.remove('show'), 2200);
 }
 
+/* In an installed PWA there's no browser chrome, so iOS's download view is
+   a trap with no way back. In standalone mode, divert wallpaper links to the
+   share sheet instead — dismissible, and "Save Image" goes straight to
+   Photos. Regular browsers keep the plain download-attribute behavior. */
+const isStandalone =
+  matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+async function shareWallpaper(e) {
+  if (!isStandalone) return; // browser: let the download attribute handle it
+  e.preventDefault();
+  const a = e.currentTarget;
+  toast('Preparing image…');
+  try {
+    const blob = await (await fetch(a.href)).blob();
+    const file = new File([blob], a.download || 'wallpaper.jpg', { type: 'image/jpeg' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file] });
+    } else {
+      window.open(a.href, '_blank'); // escapes to Safari, which has chrome
+    }
+  } catch {
+    /* share sheet dismissed — nothing to do */
+  }
+}
+
 async function askPrompt() {
   const item = currentItem();
   const text =
@@ -229,12 +254,21 @@ async function init() {
   $('pager').hidden = false;
   render();
 
+  // Deep link for Shortcuts / wall displays: ?view=full opens straight
+  // into the fullscreen viewer (e.g. "Hey Siri" -> open URL -> Speak Text).
+  if (new URLSearchParams(location.search).get('view') === 'full') {
+    openLightbox();
+  }
+
   $('prev-btn').addEventListener('click', () => { offset -= 1; render(); });
   $('next-btn').addEventListener('click', () => { offset += 1; render(); });
   $('today-btn').addEventListener('click', () => { offset = 0; render(); });
   $('ask-btn').addEventListener('click', askPrompt);
   $('listen-btn').addEventListener('click', toggleDocent);
   $('lightbox-listen').addEventListener('click', toggleDocent);
+
+  $('wallpaper-link').addEventListener('click', shareWallpaper);
+  $('wallpaper-ipad-link').addEventListener('click', shareWallpaper);
 
   $('fullscreen-btn').addEventListener('click', openLightbox);
   $('art-image').addEventListener('click', openLightbox);
