@@ -53,6 +53,7 @@ node scripts/build.mjs               # fetch + verify + process everything
 node scripts/build.mjs --verify-only # check sources/flags without downloading
 node scripts/build.mjs --force       # reprocess images (e.g. after tweaking the compositor)
 node scripts/today.mjs               # materialize today.json + today/wallpaper.jpg
+node scripts/narrate.mjs [--today]   # pre-render docent narration (needs Chatterbox on :8100)
 python3 -m http.server -d site 8080  # local preview
 ```
 

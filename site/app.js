@@ -98,12 +98,13 @@ async function askPrompt() {
   }
 }
 
-/* ── Docent: on-device text-to-speech via the Web Speech API ────────
-   iOS exposes its downloaded system voices to SpeechSynthesis; long text
-   is chunked at sentence boundaries because very long utterances can be
-   cut off or paused by the engine. */
+/* ── Docent ─────────────────────────────────────────────────────────
+   Preferred path: pre-rendered narration (audio/<slug>.m4a, neural TTS
+   rendered offline). Fallback when the file is missing or fails to load:
+   on-device SpeechSynthesis, chunked at sentence boundaries because very
+   long utterances can be cut off by the engine. */
 
-const docent = { playing: false };
+const docent = { playing: false, audio: null };
 
 function bestVoice() {
   const lang = navigator.language || 'en-US';
@@ -141,17 +142,18 @@ function updateDocentUI() {
 
 function stopDocent() {
   docent.playing = false;
+  if (docent.audio) {
+    docent.audio.pause();
+    docent.audio.removeAttribute('src');
+  }
   if ('speechSynthesis' in window) speechSynthesis.cancel();
   updateDocentUI();
 }
 
-function startDocent() {
-  if (!('speechSynthesis' in window)) { toast('Speech is not available here'); return; }
-  stopDocent();
-  const chunks = docentChunks(currentItem());
+function speakFallback(item) {
+  if (!('speechSynthesis' in window)) { stopDocent(); toast('Audio is not available here'); return; }
+  const chunks = docentChunks(item);
   const voice = bestVoice();
-  docent.playing = true;
-  updateDocentUI();
   let i = 0;
   const next = () => {
     if (!docent.playing || i >= chunks.length) { stopDocent(); return; }
@@ -163,6 +165,23 @@ function startDocent() {
     speechSynthesis.speak(u);
   };
   next();
+}
+
+function startDocent() {
+  stopDocent();
+  const item = currentItem();
+  docent.playing = true;
+  updateDocentUI();
+
+  if (item.audio) {
+    const a = docent.audio ?? (docent.audio = new Audio());
+    a.onended = () => stopDocent();
+    a.onerror = () => { if (docent.playing) speakFallback(item); };
+    a.src = item.audio;
+    a.play().catch(() => { if (docent.playing) speakFallback(item); });
+    return;
+  }
+  speakFallback(item);
 }
 
 function toggleDocent() {

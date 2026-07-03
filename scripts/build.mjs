@@ -256,6 +256,7 @@ async function main() {
     license: resolved.license,
     image: `images/display/${seed.slug}.jpg`,
     zoom: `images/zoom/${seed.slug}.jpg`,
+    audio: `audio/${seed.slug}.m4a`,
     wallpaper: `images/wall/${seed.slug}.jpg`,
     wallpaperIpad: `images/wall-ipad/${seed.slug}.jpg`,
     home: `images/home/${seed.slug}.jpg`,

@@ -34,10 +34,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== location.origin) return;
 
-  // Artwork images: cache-first with a capped runtime cache. These are
-  // content-stable (a slug's image never changes), so staleness can't bite.
-  // NOT /today/ — those paths change content daily under the same URL.
-  if (url.pathname.includes('/images/')) {
+  // Artwork images and narration: cache-first with a capped runtime cache.
+  // These are content-stable (a slug's files don't change), so staleness
+  // can't bite. NOT /today/ — those change content daily under one URL.
+  if (url.pathname.includes('/images/') || url.pathname.includes('/audio/')) {
     event.respondWith(
       caches.match(event.request).then(
         (hit) =>
