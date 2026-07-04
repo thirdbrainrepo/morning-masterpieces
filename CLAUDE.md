@@ -24,9 +24,15 @@ canonical procedure.** Everything below is the context that makes it safe.
   `scripts/narrate.mjs`. The narration hash covers text + voice + pacing, so
   new works render to match automatically. Changing voice/pacing re-renders
   the entire gallery (~1 hr) — only do it deliberately.
-- **Wallpapers never crop the painting** (matte composition, art below the
-  iOS clock zone). The iPad variant is square because iPadOS center-crops
-  one image for both orientations.
+- **Wallpapers never crop the painting** (matte composition, art fills most
+  of the canvas, caption stamped bottom-left; assumes the user repositions
+  the lock-screen clock). The iPad variant is square because iPadOS
+  center-crops one image for both orientations — art and caption must stay
+  inside the central 1668px intersection of both crops.
+- **The matte must stay dithered**: the dark gradient + shadow are composed
+  in float32 with ±1-level noise and saved at JPEG q95/4:4:4 (needs numpy).
+  Dropping the noise or the quality brings back visible banding on good
+  panels.
 - `site/images/` and `site/audio/` are **committed on purpose** — CI only
   runs `today.mjs` and deploys; it never contacts museums or the TTS server.
 

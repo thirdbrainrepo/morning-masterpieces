@@ -2,16 +2,22 @@
 """Compose the derived image variants for one artwork.
 
 Wallpaper (1640x2360): the painting matted on a dark museum-wall background,
-positioned below the iOS lock-screen clock zone, with a soft drop shadow,
-hairline frame, and a small serif caption underneath. The full painting is
-always visible -- no cropping -- so landscape works survive the portrait
-lock screen intact.
+full-bleed to the screen width, with a soft drop shadow and a small serif
+caption stamped in the bottom-left corner (clear of iOS notifications, which
+stack center-bottom). The full painting is always visible -- no cropping --
+so landscape works survive the portrait lock screen intact. Assumes the
+lock-screen clock is user-positioned away from the art.
 
-iPad wallpaper (2388x2388 square): iPads rotate, and iPadOS center-crops a
+iPad wallpaper (2420x2420 square): iPads rotate, and iPadOS center-crops a
 single wallpaper for both orientations -- portrait shows the middle column,
 landscape the middle band. The painting and caption are composed inside the
-central region that survives BOTH crops (and sits below the clock zone of
-either orientation), so nothing is cut off no matter how the iPad is held.
+central square that survives BOTH crops, so nothing is cut off no matter how
+the iPad is held.
+
+The matte, gradient, and shadow are composed in float32 and dithered with
++/-1-level triangular noise before quantizing: an 8-bit dark gradient bands
+visibly on a good panel, and JPEG then blockifies the near-flat steps.
+Wallpapers save at quality 95 / 4:4:4 to preserve the dither.
 
 Display (<=1600px long edge): plain resize for the PWA.
 
@@ -21,25 +27,35 @@ Icon mode (--icon): square center-crop PNGs for the web app manifest.
 import argparse
 import os
 import sys
+import zlib
 
+import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 Image.MAX_IMAGE_PIXELS = None  # museum scans can exceed Pillow's bomb limit
 
 W, H = 1640, 2360               # portrait lock screen (phone / pinned iPad)
-ART_MAX_W = int(W * 0.865)      # 1418
-ART_MAX_H = int(H * 0.68)       # 1604
-ART_CENTER_Y = int(H * 0.560)   # painting sits below the clock zone
+ART_MAX_W = W                   # full bleed: art may touch the side edges
+ART_MAX_H = 2000
+ART_CENTER_Y = 1080
+CAPTION_X = 72                  # bottom-left corner stamp
+CAPTION_TITLE_Y = H - 176
+CAPTION_META_Y = H - 118
 
 # Square iPad canvas: 11" iPad Pro panel is 2420x1668, so a 2420 square is
 # pixel-exact in portrait (no iPadOS upscale softening the caption). Portrait
-# crop shows the central 1668-wide column; landscape shows the central
-# 1668-tall band with the clock over its top ~340px. The art box keeps
-# painting + caption inside the intersection of both visible regions.
+# crop shows the central 1668-wide column; landscape the central 1668-tall
+# band, i.e. rows/cols 376..2044. Art and caption both live inside that
+# central 1668x1668 intersection so neither orientation cuts anything off.
 SQ = 2420
-SQ_ART_MAX_W = 1500             # within the 1668 portrait column, with margin
-SQ_ART_MAX_H = 1060             # landscape band minus clock zone and caption
-SQ_ART_CENTER_Y = 1330
+SQ_VIS_LO = (SQ - 1668) // 2    # 376: first row/col visible in both crops
+SQ_VIS_HI = SQ - SQ_VIS_LO      # 2044
+SQ_ART_MAX_W = 1560
+SQ_ART_MAX_H = 1340
+SQ_ART_CENTER_Y = 1150
+SQ_CAPTION_X = SQ_VIS_LO + 64
+SQ_CAPTION_TITLE_Y = SQ_VIS_HI - 160
+SQ_CAPTION_META_Y = SQ_VIS_HI - 106
 
 FONT_CANDIDATES = [
     "/System/Library/Fonts/Supplemental/Georgia.ttf",
@@ -77,52 +93,63 @@ def wall_color(img):
 
 
 def compose(img, title, artist, year, out_path,
-            cw, ch, art_max_w, art_max_h, art_center_y, caption_max_w):
+            cw, ch, art_max_w, art_max_h, art_center_y,
+            caption_x, caption_title_y, caption_meta_y, caption_max_w):
     bg = wall_color(img)
-    canvas = Image.new("RGB", (cw, ch), bg)
-
-    # Gentle top-lit gradient, like gallery lighting.
-    mask = Image.new("L", (1, ch))
-    mask.putdata([int(16 * (1 - y / ch) ** 2) for y in range(ch)])
-    white = Image.new("RGB", (cw, ch), (255, 255, 255))
-    canvas = Image.composite(white, canvas, mask.resize((cw, ch)))
 
     scale = min(art_max_w / img.width, art_max_h / img.height)
     pw, ph = round(img.width * scale), round(img.height * scale)
-    art = img.resize((pw, ph), Image.LANCZOS)
     x, y = cw // 2 - pw // 2, art_center_y - ph // 2
 
-    shadow = Image.new("RGBA", (cw, ch), (0, 0, 0, 0))
-    ImageDraw.Draw(shadow).rectangle([x, y + 20, x + pw, y + ph + 20], fill=(0, 0, 0, 150))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(36))
-    canvas = Image.alpha_composite(canvas.convert("RGBA"), shadow).convert("RGB")
+    # Matte + gallery-light gradient + shadow, all in float32 so the dark
+    # gradient isn't quantized until after dithering.
+    grad = 16.0 * (1.0 - np.arange(ch, dtype=np.float32) / ch) ** 2 / 255.0
+    base = np.empty((ch, cw, 3), np.float32)
+    for c in range(3):
+        base[:, :, c] = (bg[c] + (255.0 - bg[c]) * grad)[:, None]
 
+    shadow = Image.new("L", (cw, ch), 0)
+    ImageDraw.Draw(shadow).rectangle([x, y + 20, x + pw, y + ph + 20], fill=150)
+    shadow = shadow.filter(ImageFilter.GaussianBlur(36))
+    base *= 1.0 - np.asarray(shadow, np.float32)[..., None] / 255.0
+
+    rng = np.random.default_rng(zlib.crc32(os.path.basename(out_path).encode()))
+    base += rng.triangular(-1.0, 0.0, 1.0, base.shape).astype(np.float32)
+    canvas = Image.fromarray(np.clip(np.rint(base), 0, 255).astype(np.uint8))
+
+    art = img.resize((pw, ph), Image.LANCZOS)
     canvas.paste(art, (x, y))
     hairline = tuple(min(255, c + 72) for c in bg)
     ImageDraw.Draw(canvas).rectangle([x - 1, y - 1, x + pw, y + ph], outline=hairline)
 
+    # Caption: small corner stamp, left-aligned, out of the notification zone.
     draw = ImageDraw.Draw(canvas)
-    title_font = fitted_font(draw, title, 46, caption_max_w)
+    title_font = fitted_font(draw, title, 42, caption_max_w)
     meta_line = f"{artist}  ·  {year}"
-    meta_font = fitted_font(draw, meta_line, 33, caption_max_w)
-    ty = y + ph + 68
-    draw.text((cw / 2, ty), title, font=title_font, fill=(228, 224, 214), anchor="mm")
-    draw.text((cw / 2, ty + 58), meta_line, font=meta_font, fill=(158, 154, 144), anchor="mm")
+    meta_font = fitted_font(draw, meta_line, 31, caption_max_w)
+    draw.text((caption_x, caption_title_y), title,
+              font=title_font, fill=(230, 226, 216), anchor="lm")
+    draw.text((caption_x, caption_meta_y), meta_line,
+              font=meta_font, fill=(158, 154, 144), anchor="lm")
 
     # subsampling=0 (4:4:4): default 4:2:0 chroma smears light serif text
-    # against the dark matte — the single biggest caption-sharpness win.
-    canvas.save(out_path, "JPEG", quality=92, optimize=True, subsampling=0)
+    # against the dark matte. quality=95 keeps the dither noise that masks
+    # gradient banding — lower quality flattens it back into bands.
+    canvas.save(out_path, "JPEG", quality=95, optimize=True, subsampling=0)
 
 
 def make_wallpaper(img, title, artist, year, out_path):
     compose(img, title, artist, year, out_path,
-            W, H, ART_MAX_W, ART_MAX_H, ART_CENTER_Y, caption_max_w=W - 220)
+            W, H, ART_MAX_W, ART_MAX_H, ART_CENTER_Y,
+            CAPTION_X, CAPTION_TITLE_Y, CAPTION_META_Y,
+            caption_max_w=W - 2 * CAPTION_X)
 
 
 def make_wallpaper_ipad(img, title, artist, year, out_path):
-    # Caption must also survive the portrait crop's central column (1668 wide).
     compose(img, title, artist, year, out_path,
-            SQ, SQ, SQ_ART_MAX_W, SQ_ART_MAX_H, SQ_ART_CENTER_Y, caption_max_w=1500)
+            SQ, SQ, SQ_ART_MAX_W, SQ_ART_MAX_H, SQ_ART_CENTER_Y,
+            SQ_CAPTION_X, SQ_CAPTION_TITLE_Y, SQ_CAPTION_META_Y,
+            caption_max_w=SQ_VIS_HI - SQ_CAPTION_X - 40)
 
 
 def make_display(img, out_path, long_edge=1600):
