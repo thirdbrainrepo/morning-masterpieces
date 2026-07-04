@@ -60,7 +60,7 @@ function render() {
   }
   $('art-lookfor').textContent = item.lookFor;
 
-  $('museum-link').href = item.objectUrl;
+  $('museum-link').href = externalHref(item.objectUrl);
   const wall = $('wallpaper-link');
   wall.href = item.wallpaper;
   wall.download = `${item.slug}-wallpaper-iphone.jpg`;
@@ -90,6 +90,17 @@ function toast(msg) {
    Photos. Regular browsers keep the plain download-attribute behavior. */
 const isStandalone =
   matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const isiOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPadOS masquerades as Mac
+
+/* Museum sites behind bot protection (AIC's Cloudflare) challenge or block
+   the standalone PWA's in-app browser on every open, because it gets an
+   ephemeral cookie jar — clearance never persists. The x-safari-https
+   scheme (iOS 17+) opens the link in real Safari instead, where a passed
+   challenge sticks. */
+function externalHref(url) {
+  return isStandalone && isiOS ? url.replace(/^https:\/\//, 'x-safari-https://') : url;
+}
 
 async function shareWallpaper(e) {
   if (!isStandalone) return; // browser: let the download attribute handle it
