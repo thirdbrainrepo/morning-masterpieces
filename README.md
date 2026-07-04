@@ -70,15 +70,49 @@ common installs; override with `PYTHON=/path/to/python3`).
 
 Then build the 3-action iOS Shortcut: see [docs/shortcut.md](docs/shortcut.md).
 
-## Adding artworks
+## Adding artworks — the wave runbook
 
-Append a seed to the right era file in `data/seeds/` (keep chronological
-order), run `node scripts/build.mjs`, commit. Sources:
+Every batch of new works follows the same five steps. The pipeline is
+incremental throughout: existing works are never re-downloaded, re-composed,
+or re-narrated, and **the docent voice stays identical across waves** because
+the reference audio is vendored in the repo.
 
-- `met` — object ID from metmuseum.org URL; API enforces the PD flag
-- `aic` — artwork ID from artic.edu URL; API enforces the PD flag
-- `commons` — exact Commons filename (no `File:` prefix); PD by curation, so
-  stick to artists dead 100+ years
+**1. Seed.** Append entries to the right era file in `data/seeds/` (keep
+chronological order — the rotation is a survey course). Each seed needs:
+`slug`, source fields, editorial metadata (`title`, `artist`, `artistDates`,
+`year`, `medium`, `movement`, `museum`), a `lesson` (~120–160 words, factual,
+engaging), and a one-sentence `lookFor`. Sources:
+
+- `met` — object ID from the metmuseum.org URL; the build enforces the
+  `isPublicDomain` API flag
+- `aic` — artwork ID from the artic.edu URL; enforces `is_public_domain`
+- `commons` — exact Commons filename (no `File:` prefix) + `objectUrl`;
+  PD by curation, so stick to artists dead 100+ years
+
+Always set `expect` (a `|`-separated substring list matched against the API's
+title/artist) so a wrong ID fails loudly instead of shipping the wrong
+painting. Run `node scripts/build.mjs --verify-only` first to catch bad IDs
+and non-PD flags before downloading anything.
+
+**2. Build images.** `node scripts/build.mjs` — downloads originals once into
+`.cache/`, composes all six variants, rewrites `artworks.json`. New works
+only; `--force` re-composes everything (never re-downloads).
+
+**3. Narrate.** Start the Chatterbox TTS server (localhost:8100), then
+`node scripts/narrate.mjs`. Hash-tracking renders **only the new works**, in
+the same voice and pacing as the rest of the gallery: the reference voice is
+`data/voice/hanna.wav` (vendored — do not lose or replace it casually) and
+the pacing lives in the `PAUSE_*` constants in the script. Changing voice or
+pacing invalidates every hash and re-renders the whole gallery — intended
+when deliberately re-voicing (~1 hr; delegate to a cheap-model subagent),
+expensive otherwise.
+
+**4. Refresh + review.** `node scripts/today.mjs`, then eyeball a new
+wallpaper in `site/images/wall-ipad/`, play a new narration, and load the
+PWA locally (`python3 -m http.server -d site 8080`).
+
+**5. Ship.** Commit (images + audio are committed on purpose — CI never
+touches museums or the TTS server) and push; Pages deploys.
 
 Note: changing the rotation length shifts which work lands on which date
-(index = days mod N). Harmless, but today's painting will jump.
+(index = days since anchor, mod N). Harmless, but today's painting jumps once.

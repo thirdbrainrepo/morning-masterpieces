@@ -33,7 +33,19 @@ const HASHES = path.join(AUDIO, 'hashes.json');
 
 const TTS_URL = 'http://localhost:8100/v1/audio/speech';
 const TTS_MODEL = 'mlx-community/Chatterbox-Turbo-TTS-fp16';
-const REF_AUDIO = '/Users/staticzero/Developer/luna-voice/voices/cleo.wav';
+
+// The docent's voice: vendored into the repo so every future wave of works
+// renders identically. Changing this file (or the PAUSE_* constants below)
+// invalidates every hash and re-renders the whole gallery — intended when
+// deliberately re-voicing, expensive otherwise.
+const REF_AUDIO = path.join(ROOT, 'data', 'voice', 'hanna.wav');
+
+// Deliberate pacing (seconds of silence): a breath after the tombstone
+// intro, thinking room between passages, and a long contemplative beat
+// before the "look closer" coda.
+const PAUSE_INTRO = 1.1;
+const PAUSE_BETWEEN = 0.65;
+const PAUSE_CODA = 1.2;
 
 // Light normalization for speech: things the eye parses but a TTS mangles.
 function speakable(text) {
@@ -52,18 +64,32 @@ function scriptFor(item) {
   );
 }
 
-// Same chunking speak.sh uses: merge sentences into ~250-400 char chunks.
-function chunk(text) {
+// Merge sentences into passages of roughly `target` chars, breaking only
+// at sentence boundaries (short chunks garble; long ones drone).
+function mergeSentences(text, target) {
   const parts = text.split(/(?<=[.!?])\s+/).filter(Boolean);
   const merged = [parts[0]];
   for (const s of parts.slice(1)) {
-    if (merged[merged.length - 1].length < 250) merged[merged.length - 1] += ` ${s}`;
+    if (merged[merged.length - 1].length < target) merged[merged.length - 1] += ` ${s}`;
     else merged.push(s);
   }
-  if (merged.length > 1 && merged[merged.length - 1].length < 100) {
+  if (merged.length > 1 && merged[merged.length - 1].length < 90) {
     merged[merged.length - 2] += ` ${merged.pop()}`;
   }
   return merged;
+}
+
+// The narration as paced segments: each rendered separately, followed by
+// its own length of silence.
+function segments(item) {
+  const segs = [
+    { text: speakable(`${item.title}. ${item.artist}, ${item.year}.`), pause: PAUSE_INTRO },
+  ];
+  const passages = mergeSentences(speakable(item.lesson), 210);
+  for (const p of passages) segs.push({ text: p, pause: PAUSE_BETWEEN });
+  segs[segs.length - 1].pause = PAUSE_CODA;
+  segs.push({ text: speakable(`Look closer. ${item.lookFor}`), pause: 0 });
+  return segs;
 }
 
 async function renderChunk(text, outWav) {
@@ -79,23 +105,24 @@ async function renderChunk(text, outWav) {
   await writeFile(outWav, Buffer.from(await res.arrayBuffer()));
 }
 
-async function narrate(item, tmp, silence) {
-  const chunks = chunk(scriptFor(item));
-  const wavs = [];
-  for (let i = 0; i < chunks.length; i++) {
+async function narrate(item, tmp, silenceFor) {
+  const segs = segments(item);
+  const listLines = [];
+  for (let i = 0; i < segs.length; i++) {
     const raw = path.join(tmp, `${item.slug}-${i}-raw.wav`);
     const norm = path.join(tmp, `${item.slug}-${i}.wav`);
-    await renderChunk(chunks[i], raw);
+    await renderChunk(segs[i].text, raw);
     // Normalize every chunk to identical params so the concat demuxer is safe.
     await run('ffmpeg', ['-y', '-i', raw, '-ar', '44100', '-ac', '1', norm]);
-    wavs.push(norm);
+    listLines.push(`file '${norm}'`);
+    if (segs[i].pause > 0) listLines.push(`file '${await silenceFor(segs[i].pause)}'`);
   }
   const list = path.join(tmp, `${item.slug}-list.txt`);
-  await writeFile(list, wavs.map((w) => `file '${w}'`).join(`\nfile '${silence}'\n`) + '\n');
+  await writeFile(list, listLines.join('\n') + '\n');
   const out = path.join(AUDIO, `${item.slug}.m4a`);
   await run('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', list,
     '-af', 'loudnorm=I=-16:TP=-1.5', '-c:a', 'aac', '-b:a', '80k', out]);
-  return { out, chunks: chunks.length };
+  return { out, chunks: segs.length };
 }
 
 async function main() {
@@ -124,19 +151,30 @@ async function main() {
   const hashes = existsSync(HASHES) ? JSON.parse(await readFile(HASHES, 'utf8')) : {};
   const tmp = path.join(os.tmpdir(), `narrate-${process.pid}`);
   await mkdir(tmp, { recursive: true });
-  const silence = path.join(tmp, 'silence.wav');
-  await run('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono', '-t', '0.35', silence]);
+  const silences = new Map();
+  const silenceFor = async (secs) => {
+    if (!silences.has(secs)) {
+      const f = path.join(tmp, `silence-${secs}.wav`);
+      await run('ffmpeg', ['-y', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono', '-t', String(secs), f]);
+      silences.set(secs, f);
+    }
+    return silences.get(secs);
+  };
 
   let rendered = 0;
   for (const item of items) {
-    const hash = createHash('sha256').update(scriptFor(item)).digest('hex').slice(0, 16);
+    // The hash covers everything that shapes the output: script text, voice,
+    // and pacing — so changing any of them re-renders on the next run.
+    const hash = createHash('sha256')
+      .update([scriptFor(item), path.basename(REF_AUDIO), PAUSE_INTRO, PAUSE_BETWEEN, PAUSE_CODA].join('|'))
+      .digest('hex').slice(0, 16);
     const out = path.join(AUDIO, `${item.slug}.m4a`);
     if (hashes[item.slug] === hash && existsSync(out)) {
       console.log(`[skip] ${item.slug} (unchanged)`);
       continue;
     }
     process.stdout.write(`[render] ${item.slug} ... `);
-    const { chunks } = await narrate(item, tmp, silence);
+    const { chunks } = await narrate(item, tmp, silenceFor);
     hashes[item.slug] = hash;
     await writeFile(HASHES, JSON.stringify(hashes, null, 1));
     const { stdout } = await run('ffprobe', ['-v', 'quiet', '-show_entries',
