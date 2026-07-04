@@ -7,13 +7,13 @@
 //   2. Download the original image once into .cache/originals/ (gitignored).
 //   3. Compose the derived variants via scripts/process_image.py:
 //        site/images/wall/<slug>.jpg      1640x2360 portrait lock-screen wallpaper
-//        site/images/wall-ipad/<slug>.jpg 2388x2388 square, safe for both iPad orientations
+//        site/images/wall-ipad/<slug>.jpg 2420x2420 square, safe for both iPad orientations
 //        site/images/display/<slug>.jpg   <=1600px display image for the PWA
 //   4. Emit site/artworks.json in seed order (chronological survey arc).
 //
 // Usage: node scripts/build.mjs [--force] [--verify-only]
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile, rename } from 'node:fs/promises';
 import { createWriteStream, existsSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
@@ -28,7 +28,11 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = path.join(ROOT, '.cache', 'originals');
 const SITE = path.join(ROOT, 'site');
 const PROCESS = path.join(ROOT, 'scripts', 'process_image.py');
-const UA = 'MorningMasterpieces/1.0 (personal art-education project; prharrison@gmail.com)';
+// Contact for API etiquette headers. Defaults to the public project URL so
+// no personal data ships in the code; set SOURCE_CONTACT to override.
+const CONTACT = process.env.SOURCE_CONTACT
+  ?? 'https://github.com/thirdbrainrepo/morning-masterpieces';
+const UA = `MorningMasterpieces/1.0 (personal art-education project; ${CONTACT})`;
 const FORCE = process.argv.includes('--force');
 const VERIFY_ONLY = process.argv.includes('--verify-only');
 
@@ -36,7 +40,8 @@ const AIC_WIDTHS = [3000, 2400, 1686, 843];
 const COMMONS_WIDTHS = [2200, 1600, 1200];
 
 // `python3` on PATH may be a pyenv shim without Pillow; probe for one that
-// can actually import PIL. Override with PYTHON=/path/to/python3.
+// can import everything the compositor needs (Pillow AND NumPy — the matte
+// dither uses numpy). Override with PYTHON=/path/to/python3.
 let PYTHON;
 async function detectPython() {
   const candidates = [
@@ -49,11 +54,11 @@ async function detectPython() {
   ].filter(Boolean);
   for (const p of candidates) {
     try {
-      await run(p, ['-c', 'import PIL']);
+      await run(p, ['-c', 'import PIL, numpy']);
       return p;
     } catch { /* try next */ }
   }
-  throw new Error('No python3 with Pillow found. Install with: pip3 install Pillow');
+  throw new Error('No python3 with Pillow+NumPy found. Install with: pip3 install Pillow numpy');
 }
 
 async function fetchWithRetry(url, opts = {}, tries = 3) {
@@ -124,15 +129,33 @@ async function resolveAic(seed) {
 }
 
 async function resolveCommons(seed) {
+  // First-party rights check, mirroring the Met/AIC PD flags: the Commons
+  // file's own metadata must positively assert the work is out of copyright,
+  // and `expect` is checked against the REMOTE title/artist — echoing seed
+  // values back (the old behavior) made the identity check tautological.
+  const api = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2'
+    + `&prop=imageinfo&iiprop=extmetadata%7Curl&titles=${encodeURIComponent(`File:${seed.file}`)}`;
+  const info = (await getJSON(api))?.query?.pages?.[0]?.imageinfo?.[0];
+  const meta = info?.extmetadata;
+  if (!meta) throw new Error(`Commons has no metadata for ${seed.file} — cannot verify rights`);
+  const plain = (f) => (f?.value ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  const licenseShort = plain(meta.LicenseShortName);
+  const copyrighted = plain(meta.Copyrighted).toLowerCase();
+  const isPD = copyrighted === 'false' || /public domain|\bpd\b|cc0/i.test(licenseShort);
+  if (!isPD) {
+    throw new Error(`Commons does NOT flag ${seed.file} as public domain `
+      + `(license: "${licenseShort || 'unstated'}", copyrighted: "${copyrighted || 'unstated'}")`);
+  }
   for (const w of COMMONS_WIDTHS) {
     const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(seed.file)}?width=${w}`;
     const res = await fetchWithRetry(url, { method: 'HEAD' }, 4).catch(() => null);
     if (res?.ok) {
       return {
-        fetchedTitle: seed.file,
-        fetchedArtist: seed.artist,
+        fetchedTitle: plain(meta.ObjectName) || seed.file,
+        fetchedArtist: plain(meta.Artist),
         imageUrl: url,
-        objectUrl: seed.objectUrl ?? `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(seed.file)}`,
+        imageSourceUrl: info.descriptionurl,
+        objectUrl: seed.objectUrl ?? info.descriptionurl,
         license: 'Public domain — via Wikimedia Commons',
       };
     }
@@ -149,10 +172,13 @@ function norm(s) {
 async function download(url, dest) {
   // Originals are immutable — never re-download (even under --force, which
   // only reprocesses variants). Delete .cache/originals/ to truly refetch.
+  // Stream to a temp name and rename: existence is the cache check, so an
+  // interrupted transfer must never leave a partial file at the final path.
   if (existsSync(dest)) return 'cached';
   const res = await fetchWithRetry(url, { timeout: 300_000 });
   if (!res.ok) throw new Error(`download HTTP ${res.status}`);
-  await pipeline(Readable.fromWeb(res.body), createWriteStream(dest));
+  await pipeline(Readable.fromWeb(res.body), createWriteStream(`${dest}.part`));
+  await rename(`${dest}.part`, dest);
   return 'downloaded';
 }
 
@@ -235,6 +261,15 @@ async function main() {
   }
   console.log(`\n${ok.length}/${seeds.length} resolved${failed.length ? `, ${failed.length} FAILED` : ''}`);
 
+  // Fail closed BEFORE touching the manifest: writing only the successful
+  // works would shrink the rotation, remapping every future day — a
+  // transient museum outage must never masquerade as a collection change.
+  if (failed.length) {
+    if (!VERIFY_ONLY) console.error('build FAILED — site/artworks.json left untouched');
+    process.exitCode = 1;
+    return;
+  }
+
   if (VERIFY_ONLY) return;
 
   // App icon: a square detail cut from the Great Wave.
@@ -253,6 +288,7 @@ async function main() {
     movement: seed.movement,
     museum: seed.museum,
     objectUrl: resolved.objectUrl,
+    imageSourceUrl: resolved.imageSourceUrl ?? resolved.objectUrl,
     license: resolved.license,
     image: `images/display/${seed.slug}.jpg`,
     zoom: `images/zoom/${seed.slug}.jpg`,
@@ -268,7 +304,6 @@ async function main() {
   const manifest = { version: 1, anchor: '2026-01-01', count: items.length, items };
   await writeFile(path.join(SITE, 'artworks.json'), JSON.stringify(manifest, null, 1));
   console.log(`wrote site/artworks.json (${items.length} artworks)`);
-  if (failed.length) process.exitCode = 1;
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

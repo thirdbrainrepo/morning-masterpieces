@@ -29,6 +29,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      # Whole-collection integrity gate: a corrupt or missing asset for any
+      # FUTURE day must fail here, not surface weeks later when its day comes.
+      - name: Validate the collection
+        run: node scripts/validate.mjs
       - name: Materialize today's artwork
         run: TZ=America/Los_Angeles node scripts/today.mjs
       - uses: actions/configure-pages@v5

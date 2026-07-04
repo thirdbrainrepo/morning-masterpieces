@@ -23,12 +23,20 @@ function indexFor(date) {
   return ((days % n) + n) % n;
 }
 
+// The browsed date, `offset` calendar days from today. Not timestamp math:
+// local days aren't always 24h, so ±86 400 000 ms around a DST transition
+// skips or repeats a day. Noon keeps the result inside the intended date.
+function viewedDate() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, 12);
+}
+
 function currentItem() {
-  return manifest.items[indexFor(new Date(Date.now() + offset * 86_400_000))];
+  return manifest.items[indexFor(viewedDate())];
 }
 
 function render() {
-  const date = new Date(Date.now() + offset * 86_400_000);
+  const date = viewedDate();
   const idx = indexFor(date);
   const item = manifest.items[idx];
 
@@ -227,6 +235,7 @@ function toggleDocent() {
 /* ── Fullscreen viewer ────────────────────────────────────────────── */
 
 let hintTimer = null;
+let lightboxOpener = null;
 
 function updateRotateHint() {
   const img = $('lightbox-img');
@@ -247,6 +256,11 @@ function openLightbox() {
   img.onload = updateRotateHint;
   $('lightbox').hidden = false;
   document.body.classList.add('lightbox-open');
+  // Modal semantics for assistive tech: background inert, focus inside,
+  // restored to the opener on close.
+  lightboxOpener = document.activeElement;
+  for (const id of ['main', 'pager']) $(id).inert = true;
+  $('lightbox-close').focus();
   const lb = $('lightbox');
   (lb.requestFullscreen?.() ?? lb.webkitRequestFullscreen?.())?.catch?.(() => {});
 }
@@ -254,6 +268,9 @@ function openLightbox() {
 function closeLightbox() {
   $('lightbox').hidden = true;
   document.body.classList.remove('lightbox-open');
+  for (const id of ['main', 'pager']) $(id).inert = false;
+  lightboxOpener?.focus?.();
+  lightboxOpener = null;
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 

@@ -14,15 +14,11 @@ canonical procedure.** Everything below is the context that makes it safe.
 - **"Today" is deterministic**: days since `2026-01-01` (local midnight),
   mod rotation length — computed identically in `site/app.js` and
   `scripts/today.mjs`. No stored state anywhere.
-- **Copyright is enforced by the source's own rights flag** (Met
-  `isPublicDomain`, AIC `is_public_domain`, Commons `extmetadata`
-  Copyrighted/License); the build hard-fails otherwise. Never bypass —
-  museum photo uploads on Commons often carry CC BY-SA claims.
-- **Every seed carries `expect`** — a substring checked against the source's
-  REMOTE title/artist metadata so a wrong ID fails loudly instead of
-  shipping the wrong painting. Same-titled works by one artist can still
-  slip through (Fragonard painted two *Swings*) — always eyeball a newly
-  downloaded work.
+- **Copyright is enforced by the museum's own API flag** (Met
+  `isPublicDomain`, AIC `is_public_domain`); the build hard-fails otherwise.
+  Commons works are PD by curation (artists dead 100+ years). Never bypass.
+- **Every seed carries `expect`** — an API-response sanity substring so a
+  wrong object ID fails loudly instead of shipping the wrong painting.
 - **The docent voice must stay consistent across waves**: reference audio is
   vendored at `data/voice/hanna.wav`; pacing is the `PAUSE_*` constants in
   `scripts/narrate.mjs`. The narration hash covers text + voice + pacing, so
@@ -38,8 +34,7 @@ canonical procedure.** Everything below is the context that makes it safe.
   Dropping the noise or the quality brings back visible banding on good
   panels.
 - `site/images/` and `site/audio/` are **committed on purpose** — CI only
-  runs `validate.mjs` (offline integrity gate) + `today.mjs` and deploys;
-  it never contacts museums or the TTS server.
+  runs `today.mjs` and deploys; it never contacts museums or the TTS server.
 
 ## Local environment quirks
 
@@ -67,6 +62,3 @@ canonical procedure.** Everything below is the context that makes it safe.
 - The service worker shell is network-first by design (cache-first pinned
   installed PWAs to stale versions). `/today/*` must never be cache-first —
   content changes daily under fixed URLs.
-- `/images/` and `/audio/` ARE cache-first — so **bump `VERSION` in
-  `site/sw.js` whenever committed media bytes change under stable URLs**
-  (e.g. a `--force` recomposition), or installed PWAs keep the old bytes.

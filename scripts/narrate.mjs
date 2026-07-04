@@ -13,6 +13,10 @@
 //   node scripts/narrate.mjs --today          render only today's work
 //   node scripts/narrate.mjs --slug=<slug>    render one work
 //   node scripts/narrate.mjs                  render everything missing/stale
+//   node scripts/narrate.mjs --rekey          rewrite hashes.json for existing
+//                                             audio WITHOUT rendering — only
+//                                             after a hash-scheme change when
+//                                             the current files are known good
 //
 // Requires: the Chatterbox server (localhost:8100) and ffmpeg.
 
@@ -46,6 +50,13 @@ const REF_AUDIO = path.join(ROOT, 'data', 'voice', 'hanna.wav');
 const PAUSE_INTRO = 1.1;
 const PAUSE_BETWEEN = 0.65;
 const PAUSE_CODA = 1.2;
+
+// Everything below also shapes the rendered audio, so it all feeds the
+// narration hash. Bump RENDERER_VERSION for behavior changes the constants
+// don't capture (segmenting logic, speakable() rules, ffmpeg pipeline).
+const MERGE_TARGET = 210;               // chars per merged lesson passage
+const ENCODE = 'loudnorm=I=-16:TP=-1.5|aac|80k|mono';
+const RENDERER_VERSION = 1;
 
 // Light normalization for speech: things the eye parses but a TTS mangles.
 function speakable(text) {
@@ -85,7 +96,7 @@ function segments(item) {
   const segs = [
     { text: speakable(`${item.title}. ${item.artist}, ${item.year}.`), pause: PAUSE_INTRO },
   ];
-  const passages = mergeSentences(speakable(item.lesson), 210);
+  const passages = mergeSentences(speakable(item.lesson), MERGE_TARGET);
   for (const p of passages) segs.push({ text: p, pause: PAUSE_BETWEEN });
   segs[segs.length - 1].pause = PAUSE_CODA;
   segs.push({ text: speakable(`Look closer. ${item.lookFor}`), pause: 0 });
@@ -128,6 +139,7 @@ async function narrate(item, tmp, silenceFor) {
 async function main() {
   const args = process.argv.slice(2);
   const onlyToday = args.includes('--today');
+  const rekey = args.includes('--rekey');
   const onlySlug = args.find((a) => a.startsWith('--slug='))?.slice(7);
 
   const manifest = JSON.parse(await readFile(path.join(SITE, 'artworks.json'), 'utf8'));
@@ -144,8 +156,14 @@ async function main() {
     if (!items.length) throw new Error(`no such slug: ${onlySlug}`);
   }
 
-  const up = await fetch('http://localhost:8100/docs').then((r) => r.ok).catch(() => false);
-  if (!up) throw new Error('Chatterbox TTS server is not running on localhost:8100');
+  if (!rekey) {
+    const up = await fetch('http://localhost:8100/docs').then((r) => r.ok).catch(() => false);
+    if (!up) throw new Error('Chatterbox TTS server is not running on localhost:8100');
+  }
+
+  // The docent's identity is the voice FILE's bytes, not its filename —
+  // swapping in a different hanna.wav must invalidate every narration.
+  const voiceHash = createHash('sha256').update(await readFile(REF_AUDIO)).digest('hex').slice(0, 16);
 
   await mkdir(AUDIO, { recursive: true });
   const hashes = existsSync(HASHES) ? JSON.parse(await readFile(HASHES, 'utf8')) : {};
@@ -162,28 +180,42 @@ async function main() {
   };
 
   let rendered = 0;
-  for (const item of items) {
-    // The hash covers everything that shapes the output: script text, voice,
-    // and pacing — so changing any of them re-renders on the next run.
-    const hash = createHash('sha256')
-      .update([scriptFor(item), path.basename(REF_AUDIO), PAUSE_INTRO, PAUSE_BETWEEN, PAUSE_CODA].join('|'))
-      .digest('hex').slice(0, 16);
-    const out = path.join(AUDIO, `${item.slug}.m4a`);
-    if (hashes[item.slug] === hash && existsSync(out)) {
-      console.log(`[skip] ${item.slug} (unchanged)`);
-      continue;
+  try {
+    for (const item of items) {
+      // The hash covers everything that shapes the output: script text, the
+      // voice file's bytes, model, pacing, segmenting, and encoding — so
+      // changing any of them re-renders on the next run.
+      const hash = createHash('sha256')
+        .update([scriptFor(item), voiceHash, TTS_MODEL, MERGE_TARGET,
+          PAUSE_INTRO, PAUSE_BETWEEN, PAUSE_CODA, ENCODE, RENDERER_VERSION].join('|'))
+        .digest('hex').slice(0, 16);
+      const out = path.join(AUDIO, `${item.slug}.m4a`);
+      if (rekey) {
+        if (!existsSync(out)) throw new Error(`--rekey: ${item.slug}.m4a missing — render it instead`);
+        hashes[item.slug] = hash;
+        continue;
+      }
+      if (hashes[item.slug] === hash && existsSync(out)) {
+        console.log(`[skip] ${item.slug} (unchanged)`);
+        continue;
+      }
+      process.stdout.write(`[render] ${item.slug} ... `);
+      const { chunks } = await narrate(item, tmp, silenceFor);
+      hashes[item.slug] = hash;
+      await writeFile(HASHES, JSON.stringify(hashes, null, 1));
+      const { stdout } = await run('ffprobe', ['-v', 'quiet', '-show_entries',
+        'format=duration', '-of', 'csv=p=0', out]);
+      console.log(`${chunks} chunks, ${Math.round(parseFloat(stdout))}s`);
+      rendered++;
     }
-    process.stdout.write(`[render] ${item.slug} ... `);
-    const { chunks } = await narrate(item, tmp, silenceFor);
-    hashes[item.slug] = hash;
-    await writeFile(HASHES, JSON.stringify(hashes, null, 1));
-    const { stdout } = await run('ffprobe', ['-v', 'quiet', '-show_entries',
-      'format=duration', '-of', 'csv=p=0', out]);
-    console.log(`${chunks} chunks, ${Math.round(parseFloat(stdout))}s`);
-    rendered++;
+    if (rekey) {
+      await writeFile(HASHES, JSON.stringify(hashes, null, 1));
+      console.log(`rekeyed ${items.length} entries in hashes.json (no audio rendered)`);
+      return;
+    }
+  } finally {
+    await rm(tmp, { recursive: true, force: true });
   }
-
-  await rm(tmp, { recursive: true, force: true });
   console.log(`\n${rendered} rendered, ${items.length - rendered} skipped`);
 }
 

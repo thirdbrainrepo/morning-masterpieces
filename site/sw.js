@@ -4,8 +4,13 @@
 // The shell is deliberately NOT cache-first: this site deploys silently in
 // the background (daily CI, occasional layout fixes), and a cache-first
 // shell would pin every installed PWA to whatever version it first saw.
+//
+// BUMP VERSION whenever committed media bytes change under stable URLs
+// (e.g. a --force recomposition of wallpapers). Media is cache-first, so
+// installed PWAs keep serving the old bytes until the image cache is
+// renamed away by a version bump.
 
-const VERSION = 'mm-v3';
+const VERSION = 'mm-v4';
 const SHELL = ['./', 'index.html', 'shortcuts.html', 'styles.css', 'app.js', 'manifest.webmanifest'];
 const IMAGE_CACHE = `${VERSION}-images`;
 const IMAGE_LIMIT = 80;
@@ -35,19 +40,24 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== location.origin) return;
 
   // Artwork images and narration: cache-first with a capped runtime cache.
-  // These are content-stable (a slug's files don't change), so staleness
-  // can't bite. NOT /today/ — those change content daily under one URL.
+  // These are content-stable between version bumps. NOT /today/ — those
+  // change content daily under one URL.
   if (url.pathname.includes('/images/') || url.pathname.includes('/audio/')) {
     event.respondWith(
       caches.match(event.request).then(
         (hit) =>
           hit ||
           fetch(event.request).then((res) => {
-            const copy = res.clone();
-            caches.open(IMAGE_CACHE).then((c) => {
-              c.put(event.request, copy);
-              trimCache(IMAGE_CACHE, IMAGE_LIMIT);
-            });
+            // Never cache failures: a 404 cached under a stable media URL
+            // (e.g. narration rendered a day late) would stick forever.
+            if (res.ok) {
+              const copy = res.clone();
+              event.waitUntil(
+                caches.open(IMAGE_CACHE).then((c) =>
+                  c.put(event.request, copy).then(() => trimCache(IMAGE_CACHE, IMAGE_LIMIT))
+                )
+              );
+            }
             return res;
           })
       )
@@ -56,14 +66,20 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Everything else (shell, artworks.json, today.json): network-first,
-  // falling back to the last cached copy when offline.
+  // falling back to the last cached copy when offline. Navigations fall
+  // back to the cached shell so deep links like /?view=full work offline.
   event.respondWith(
     fetch(event.request)
       .then((res) => {
-        const copy = res.clone();
-        caches.open(VERSION).then((c) => c.put(event.request, copy));
+        if (res.ok) {
+          const copy = res.clone();
+          event.waitUntil(caches.open(VERSION).then((c) => c.put(event.request, copy)));
+        }
         return res;
       })
-      .catch(() => caches.match(event.request))
+      .catch(async () =>
+        (await caches.match(event.request)) ??
+        (event.request.mode === 'navigate' ? caches.match('index.html') : undefined)
+      )
   );
 });

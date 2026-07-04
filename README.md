@@ -57,8 +57,8 @@ node scripts/narrate.mjs [--today]   # pre-render docent narration (needs Chatte
 python3 -m http.server -d site 8080  # local preview
 ```
 
-Requires Node 18+ and a Python 3 with Pillow (the build auto-detects among
-common installs; override with `PYTHON=/path/to/python3`).
+Requires Node 18+ and a Python 3 with Pillow and NumPy (the build
+auto-detects among common installs; override with `PYTHON=/path/to/python3`).
 
 ## Deploying
 
@@ -68,7 +68,7 @@ common installs; override with `PYTHON=/path/to/python3`).
 3. Done. Pushes deploy; the cron in `.github/workflows/deploy.yml` rolls
    `today.json` + `today/wallpaper.jpg` just after midnight Pacific.
 
-Then build the 3-action iOS Shortcut: see [docs/shortcut.md](docs/shortcut.md).
+Then build the iOS Shortcut: see [docs/shortcut.md](docs/shortcut.md).
 
 ## Adding artworks — the wave runbook
 
@@ -80,19 +80,26 @@ the reference audio is vendored in the repo.
 **1. Seed.** Append entries to the right era file in `data/seeds/` (keep
 chronological order — the rotation is a survey course). Each seed needs:
 `slug`, source fields, editorial metadata (`title`, `artist`, `artistDates`,
-`year`, `medium`, `movement`, `museum`), a `lesson` (~120–160 words, factual,
-engaging), and a one-sentence `lookFor`. Sources:
+`year`, `medium`, `movement`, `museum`), a `lesson` (~120–180 words as a
+guideline, factual, engaging), and a one-sentence `lookFor`. Sources:
 
 - `met` — object ID from the metmuseum.org URL; the build enforces the
   `isPublicDomain` API flag
 - `aic` — artwork ID from the artic.edu URL; enforces `is_public_domain`
 - `commons` — exact Commons filename (no `File:` prefix) + `objectUrl`;
-  PD by curation, so stick to artists dead 100+ years
+  the build enforces the file's own Commons rights metadata (`Copyrighted:
+  False` / a public-domain license) and fails closed if it's absent —
+  museum photo uploads often carry CC BY-SA claims, so prefer files tagged
+  PD-Art. Curate long-dead artists anyway; the flag is the backstop.
 
-Always set `expect` (a `|`-separated substring list matched against the API's
-title/artist) so a wrong ID fails loudly instead of shipping the wrong
-painting. Run `node scripts/build.mjs --verify-only` first to catch bad IDs
-and non-PD flags before downloading anything.
+Always set `expect` (a `|`-separated substring list matched against the
+API's remote title/artist metadata) so a wrong ID fails loudly instead of
+shipping the wrong painting. Beware same-titled works by one artist —
+Fragonard painted two *Swings* — and use a disambiguating title substring,
+not just the artist's name. Run `node scripts/build.mjs --verify-only`
+first to catch bad IDs and non-PD flags before downloading anything, and
+**visually confirm any newly downloaded work** — metadata can match while
+the file is a different painting.
 
 **2. Build images.** `node scripts/build.mjs` — downloads originals once into
 `.cache/`, composes all six variants, rewrites `artworks.json`. New works
@@ -107,9 +114,11 @@ pacing invalidates every hash and re-renders the whole gallery — intended
 when deliberately re-voicing (~1 hr; delegate to a cheap-model subagent),
 expensive otherwise.
 
-**4. Refresh + review.** `node scripts/today.mjs`, then eyeball a new
-wallpaper in `site/images/wall-ipad/`, play a new narration, and load the
-PWA locally (`python3 -m http.server -d site 8080`).
+**4. Refresh + review.** `node scripts/validate.mjs` (the same integrity
+gate CI runs before deploying — count, order, every asset, hashes), then
+`node scripts/today.mjs`, then eyeball a new wallpaper in
+`site/images/wall-ipad/`, play a new narration, and load the PWA locally
+(`python3 -m http.server -d site 8080`).
 
 **5. Ship.** Commit (images + audio are committed on purpose — CI never
 touches museums or the TTS server) and push; Pages deploys.
