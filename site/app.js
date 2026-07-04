@@ -178,10 +178,16 @@ function docentChunks(item) {
 }
 
 function updateDocentUI() {
-  $('listen-btn').textContent = docent.playing
-    ? '■ Stop the docent'
-    : 'Listen — the docent reads today’s lesson';
-  $('lightbox-listen').textContent = docent.playing ? '■ Stop' : 'Listen';
+  const playing = docent.playing;
+  const btn = $('listen-btn');
+  btn.classList.toggle('playing', playing);
+  btn.setAttribute('aria-pressed', String(playing));
+  const label = playing ? 'Stop the docent' : 'Listen — the docent reads today’s lesson';
+  btn.setAttribute('aria-label', label);
+  btn.title = label;
+  $('listen-icon-play').hidden = playing;
+  $('listen-icon-stop').hidden = !playing;
+  $('lightbox-listen').textContent = playing ? '■ Stop' : 'Listen';
 }
 
 function stopDocent() {
@@ -274,9 +280,22 @@ function closeLightbox() {
   if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
 }
 
+/* A long-lived page (installed PWA left open overnight) should follow the
+   rotation on its own. When the local calendar date changes and the user is
+   on "today", re-render; while they're browsing another day, leave them be. */
+let renderedYMD = null;
+
+function maybeRollover() {
+  const now = localYMD(new Date());
+  if (now === renderedYMD) return;
+  renderedYMD = now;
+  if (offset === 0) render();
+}
+
 async function init() {
   const res = await fetch('artworks.json');
   manifest = await res.json();
+  renderedYMD = localYMD(new Date());
 
   $('main').hidden = false;
   $('pager').hidden = false;
@@ -298,7 +317,7 @@ async function init() {
   $('wallpaper-link').addEventListener('click', shareWallpaper);
   $('wallpaper-ipad-link').addEventListener('click', shareWallpaper);
 
-  $('fullscreen-btn').addEventListener('click', openLightbox);
+  $('zoom-btn').addEventListener('click', openLightbox);
   $('art-image').addEventListener('click', openLightbox);
   $('lightbox-close').addEventListener('click', closeLightbox);
   $('lightbox').addEventListener('click', (e) => {
@@ -320,6 +339,13 @@ async function init() {
     speechSynthesis.getVoices();
     speechSynthesis.addEventListener?.('voiceschanged', () => speechSynthesis.getVoices());
   }
+
+  // iOS fires visibilitychange when the PWA returns to the foreground —
+  // the interval alone wouldn't run while suspended in the background.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) maybeRollover();
+  });
+  setInterval(maybeRollover, 60_000);
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(() => {});

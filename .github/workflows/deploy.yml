@@ -39,8 +39,15 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
+      # Pages dedupes deployments by pages_build_version, which deploy-pages
+      # fills from GITHUB_SHA. The daily cron redeploys the SAME commit with
+      # fresh today/* content — without a unique version Pages silently
+      # no-ops (run goes green, stable URLs stay stale; bitten 2026-07-04).
+      # Overriding GITHUB_SHA per run makes every deployment distinct.
       - id: deployment
         uses: actions/deploy-pages@v4
+        env:
+          GITHUB_SHA: ${{ github.sha }}-${{ github.run_id }}
         continue-on-error: true
       # Pages deployment intermittently fails with "try again later"; an
       # immediate retry tends to hit the same transient state, so cool down
@@ -50,3 +57,5 @@ jobs:
       - id: deployment-retry
         if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v4
+        env:
+          GITHUB_SHA: ${{ github.sha }}-${{ github.run_id }}-retry

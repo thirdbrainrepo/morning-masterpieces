@@ -25,6 +25,11 @@
     <figure class="artwork">
       <div class="frame">
         <img id="art-image" alt="" decoding="async">
+        <button id="zoom-btn" class="frame-zoom" type="button" aria-label="View fullscreen" title="View fullscreen">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h6v6"/><path d="M9 21H3v-6"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>
+          </svg>
+        </button>
       </div>
       <figcaption>
         <h2 id="art-title"></h2>
@@ -38,6 +43,18 @@
         <div><dt>Medium</dt><dd id="art-medium"></dd></div>
         <div><dt>Movement</dt><dd id="art-movement"></dd></div>
         <div><dt>Collection</dt><dd id="art-museum"></dd></div>
+        <div class="tombstone-listen">
+          <button id="listen-btn" class="icon-btn" type="button" aria-pressed="false"
+                  aria-label="Listen — the docent reads today’s lesson" title="Listen — the docent reads today’s lesson">
+            <svg id="listen-icon-play" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 3 9 3 15 6 15 11 19 11 5" fill="currentColor" stroke="none"/>
+              <path d="M15.5 8.8a4.5 4.5 0 0 1 0 6.4"/><path d="M18.2 6a8.3 8.3 0 0 1 0 12"/>
+            </svg>
+            <svg id="listen-icon-stop" viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" hidden>
+              <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
       </dl>
 
       <section class="lesson">
@@ -51,8 +68,6 @@
       </aside>
 
       <nav class="actions">
-        <button id="listen-btn" class="action" type="button">Listen — the docent reads today’s lesson</button>
-        <button id="fullscreen-btn" class="action" type="button">View fullscreen</button>
         <button id="ask-btn" class="action" type="button">Copy a prompt to ask about this work</button>
         <a id="museum-link" class="action" target="_blank" rel="noopener">View at the museum&nbsp;→</a>
         <a id="wallpaper-link" class="action">Download wallpaper · iPhone</a>

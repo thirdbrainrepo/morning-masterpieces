@@ -55,12 +55,36 @@ main { animation: fade 0.5s ease; }
 .artwork { margin-bottom: 2rem; }
 
 .frame {
+  position: relative; /* anchors the fullscreen glyph */
   background: var(--wall-raised);
   border: 1px solid var(--hairline);
   padding: 10px;
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
   cursor: zoom-in;
 }
+
+/* Low-key fullscreen affordance in the image corner — tapping the image
+   works too, but a visible glyph makes the capability discoverable. */
+.frame-zoom {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: #ddd;
+  background: rgba(18, 16, 13, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  opacity: 0.78;
+  transition: opacity 0.2s, border-color 0.2s;
+}
+.frame-zoom:hover, .frame-zoom:active { opacity: 1; border-color: var(--accent); }
 
 .frame img {
   display: block;
@@ -83,14 +107,38 @@ figcaption h2 {
 .dim { color: var(--ink-faint); font-size: 0.9em; }
 
 .tombstone {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 0.9rem 1.5rem;
   border-top: 1px solid var(--hairline);
   border-bottom: 1px solid var(--hairline);
-  padding: 1.1rem 0.2rem;
+  padding: 1.1rem 3.4rem 1.1rem 0.2rem; /* right gap reserved for the docent icon */
   margin-bottom: 2rem;
 }
+
+.tombstone-listen {
+  position: absolute;
+  top: 50%;
+  right: 0.2rem;
+  transform: translateY(-50%);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  color: var(--ink-dim);
+  background: none;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.icon-btn:hover, .icon-btn:active { border-color: var(--accent); color: var(--ink); }
+.icon-btn.playing { color: var(--accent); border-color: var(--accent); }
 
 .tombstone dt {
   font-family: -apple-system, system-ui, sans-serif;
@@ -284,7 +332,11 @@ body.lightbox-open { overflow: hidden; }
   .artwork {
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    /* Top-anchored, not centered: on a tall browser window a vertically
+       centered painting drifts too low. The clamp keeps a modest offset
+       that reads near-centered on short viewports (iPad landscape). */
+    justify-content: flex-start;
+    padding-top: clamp(0rem, 4vh, 3.5rem);
     min-height: 0;
     margin-bottom: 0;
   }
