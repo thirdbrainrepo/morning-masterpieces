@@ -158,9 +158,10 @@ def make_display(img, out_path, long_edge=1600):
     out.save(out_path, "JPEG", quality=84, optimize=True)
 
 
-def make_zoom(img, out_path, long_edge=2600):
-    """Highest-resolution variant we serve — for the PWA's fullscreen viewer.
-    Only ever downscales, so it's capped by what the museum gave us."""
+def make_zoom(img, out_path, long_edge=3840):
+    """Highest-resolution variant we serve — fullscreen viewing on 4K
+    displays. Only ever downscales, so it's capped by what the museum
+    gave us."""
     scale = min(1.0, long_edge / max(img.width, img.height))
     out = img.resize((round(img.width * scale), round(img.height * scale)), Image.LANCZOS)
     out.save(out_path, "JPEG", quality=86, optimize=True)

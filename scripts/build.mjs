@@ -36,8 +36,12 @@ const UA = `MorningMasterpieces/1.0 (personal art-education project; ${CONTACT})
 const FORCE = process.argv.includes('--force');
 const VERIFY_ONLY = process.argv.includes('--verify-only');
 
-const AIC_WIDTHS = [3000, 2400, 1686, 843];
-const COMMONS_WIDTHS = [2200, 1600, 1200];
+const AIC_WIDTHS = [3840, 3000, 2400, 1686, 843];
+// Commons: fetch the true original when it's at or under this width,
+// otherwise a thumbnail rendered at it. 4500 comfortably feeds the 3840px
+// zoom variant without pulling 200MB museum master scans.
+const COMMONS_MAX_W = 4500;
+const COMMONS_FALLBACK_WIDTHS = [4500, 3200, 2200, 1600, 1200];
 
 // `python3` on PATH may be a pyenv shim without Pillow; probe for one that
 // can import everything the compositor needs (Pillow AND NumPy — the matte
@@ -134,7 +138,7 @@ async function resolveCommons(seed) {
   // and `expect` is checked against the REMOTE title/artist — echoing seed
   // values back (the old behavior) made the identity check tautological.
   const api = 'https://commons.wikimedia.org/w/api.php?action=query&format=json&formatversion=2'
-    + `&prop=imageinfo&iiprop=extmetadata%7Curl&titles=${encodeURIComponent(`File:${seed.file}`)}`;
+    + `&prop=imageinfo&iiprop=extmetadata%7Curl%7Csize&titles=${encodeURIComponent(`File:${seed.file}`)}`;
   const info = (await getJSON(api))?.query?.pages?.[0]?.imageinfo?.[0];
   const meta = info?.extmetadata;
   if (!meta) throw new Error(`Commons has no metadata for ${seed.file} — cannot verify rights`);
@@ -146,8 +150,15 @@ async function resolveCommons(seed) {
     throw new Error(`Commons does NOT flag ${seed.file} as public domain `
       + `(license: "${licenseShort || 'unstated'}", copyrighted: "${copyrighted || 'unstated'}")`);
   }
-  for (const w of COMMONS_WIDTHS) {
-    const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(seed.file)}?width=${w}`;
+  // Best available source up to COMMONS_MAX_W: the original file itself
+  // when it fits (a fixed width ladder alone can undershoot — a 3000px
+  // original would fall through 4500 to a 2200px render), else a
+  // thumbnail ladder from the cap downward.
+  const candidates = (info.width && info.width <= COMMONS_MAX_W && info.url) ? [info.url] : [];
+  candidates.push(...COMMONS_FALLBACK_WIDTHS
+    .filter((w) => !info.width || w < info.width)
+    .map((w) => `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(seed.file)}?width=${w}`));
+  for (const url of candidates) {
     const res = await fetchWithRetry(url, { method: 'HEAD' }, 4).catch(() => null);
     if (res?.ok) {
       return {
