@@ -61,7 +61,9 @@ canonical procedure.** Everything below is the context that makes it safe.
   -05). The nightly rollover is therefore `roll.yml`: it **commits**
   `today.json` + `today/*` (tracked in git now; the jpgs dedupe to existing
   blobs) and chain-dispatches `deploy.yml` on the fresh SHA. Keep that
-  design; a bare re-deploy of an old SHA is not trustworthy.
+  design; a bare re-deploy of an old SHA is not trustworthy. Because the
+  roll bot commits to main nightly, **`git pull --rebase` before pushing**
+  local work.
 
 ## Front-end gotchas already learned the hard way
 
