@@ -54,10 +54,14 @@ canonical procedure.** Everything below is the context that makes it safe.
 - GitHub Pages deploys fail transiently (~half the time); the workflow
   retries once after a 2-minute cool-down. If a manual deploy fails, a fresh
   `gh workflow run deploy.yml` has always worked.
-- Pages **dedupes deployments by `pages_build_version`** (deploy-pages fills
-  it from `GITHUB_SHA`): redeploying the same commit silently no-ops with a
-  green run — which broke the daily cron (same commit, fresh `today/*`).
-  The workflow overrides `GITHUB_SHA` per run; keep that.
+- Pages **keys deployments on `pages_build_version`** (deploy-pages fills it
+  from `GITHUB_SHA`; the runner strips overrides of reserved vars):
+  redeploying an unchanged commit reports success but usually keeps serving
+  the old artifact — this silently broke the daily cron twice (2026-07-04,
+  -05). The nightly rollover is therefore `roll.yml`: it **commits**
+  `today.json` + `today/*` (tracked in git now; the jpgs dedupe to existing
+  blobs) and chain-dispatches `deploy.yml` on the fresh SHA. Keep that
+  design; a bare re-deploy of an old SHA is not trustworthy.
 
 ## Front-end gotchas already learned the hard way
 

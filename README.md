@@ -65,8 +65,10 @@ auto-detects among common installs; override with `PYTHON=/path/to/python3`).
 1. Create a GitHub repo and push (`site/images/` is committed on purpose —
    CI never re-downloads from the museums).
 2. Repo **Settings → Pages → Source: GitHub Actions**.
-3. Done. Pushes deploy; the cron in `.github/workflows/deploy.yml` rolls
-   `today.json` + `today/wallpaper.jpg` just after midnight Pacific.
+3. Done. Pushes deploy; the nightly cron in `.github/workflows/roll.yml`
+   commits the new day's `today.json` + `today/*` just after midnight
+   Pacific and dispatches the deploy (Pages won't reliably serve a
+   redeploy of an unchanged commit, so the rollover must be a real commit).
 
 Then build the iOS Shortcut: see [docs/shortcut.md](docs/shortcut.md).
 

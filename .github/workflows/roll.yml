@@ -1,0 +1,56 @@
+name: Roll the day
+
+# Nightly rollover. COMMITS the freshly materialized today.json + today/*
+# and then dispatches the deploy workflow, so every daily deployment rides
+# a brand-new commit SHA.
+#
+# Why not deploy straight from the cron (the old design): GitHub Pages keys
+# deployments on pages_build_version, which actions/deploy-pages fills from
+# GITHUB_SHA and the runner won't let a workflow override (reserved var).
+# Redeploying an unchanged SHA reports success but usually keeps serving
+# the old artifact — the cron was green for days while today/* never moved.
+# A real commit makes the version genuinely unique; the chained
+# workflow_dispatch is the documented exception to GITHUB_TOKEN-event loop
+# prevention (a token push alone would trigger nothing).
+#
+# The daily commit is nearly free: today/*.jpg are byte-identical copies of
+# blobs already in git, so each roll adds only a commit + tree objects.
+
+on:
+  schedule:
+    # 08:10 UTC = 12:10 AM Pacific in winter, 1:10 AM in summer — either
+    # way past local midnight, well before the 6 AM Shortcuts.
+    - cron: '10 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write # gh workflow run deploy.yml
+
+concurrency:
+  group: roll
+
+jobs:
+  roll:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Materialize today's artwork
+        run: TZ=America/Los_Angeles node scripts/today.mjs
+      - name: Commit the roll and dispatch the deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git add site/today.json site/today
+          if git diff --cached --quiet; then
+            echo "today/* already current — nothing to roll"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Roll to $(TZ=America/Los_Angeles date +%F)"
+          git push
+          gh workflow run deploy.yml
