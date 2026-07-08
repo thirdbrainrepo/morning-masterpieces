@@ -12,9 +12,7 @@
  "el-greco-view-of-toledo": "5f23cf79cdbfcc6c",
  "caravaggio-calling-st-matthew": "34f1c4b1937f141b",
  "gentileschi-judith-holofernes": "f42d29af40794917",
- "leyster-self-portrait": "6b6663b9bb8fa21d",
  "rembrandt-night-watch": "f0c6d4bab22e70c6",
- "velazquez-las-meninas": "933b0d383fa859ed",
  "vermeer-milkmaid": "55bb1b23a53d500b",
  "rembrandt-self-portrait-1660": "58af34776c836a26",
  "vermeer-girl-pearl-earring": "afb99293bc0ba5f1",
@@ -28,8 +26,6 @@
  "turner-fighting-temeraire": "748c83f1dc0317eb",
  "leutze-washington-crossing": "e0ea321a8bf3d7f0",
  "millet-gleaners": "a6df62f8b675b029",
- "hiroshige-sudden-shower": "8a62e45da85c16f7",
- "whistler-mother": "d4c2b4a3b8a1d247",
  "monet-impression-sunrise": "9d0327f68d9d33f6",
  "morisot-cradle": "f0b2bd0ade04bddf",
  "degas-dance-class": "820dfdef7acb61b8",
@@ -39,7 +35,6 @@
  "seurat-grande-jatte": "b81499041a6ca164",
  "van-gogh-starry-night": "eab550d5fcb2f5eb",
  "van-gogh-wheat-field-cypresses": "d2f2a346fef270c0",
- "munch-scream": "b0c2b3020d1505bb",
  "cezanne-basket-of-apples": "2f387eb8717f5b48",
  "cassatt-childs-bath": "e6147fb7707511e3",
  "toulouse-lautrec-moulin-rouge": "bfe31456158e72c3",
@@ -48,5 +43,10 @@
  "monet-water-lilies": "8bbf9f600fd5597c",
  "klimt-the-kiss": "298b86ec63b86edf",
  "kandinsky-improvisation-30": "3f76c54bae26ee2e",
- "van-gogh-bedroom": "98e7382209dc995b"
+ "van-gogh-bedroom": "98e7382209dc995b",
+ "hiroshige-sudden-shower": "8a62e45da85c16f7",
+ "leyster-self-portrait": "6b6663b9bb8fa21d",
+ "munch-scream": "b0c2b3020d1505bb",
+ "velazquez-las-meninas": "933b0d383fa859ed",
+ "whistler-mother": "d4c2b4a3b8a1d247"
 }

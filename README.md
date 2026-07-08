@@ -116,6 +116,11 @@ pacing invalidates every hash and re-renders the whole gallery — intended
 when deliberately re-voicing (~1 hr; delegate to a cheap-model subagent),
 expensive otherwise.
 
+Then **verify the takes**: `node scripts/check-narrations.mjs --slug=<new>`
+transcribes the audio and machine-checks it against the script. TTS renders
+stutter or drop sentences roughly 1 time in 10 — a bad take re-rolls clean:
+delete the work's `hashes.json` entry, re-run `narrate.mjs --slug=`, re-check.
+
 **4. Refresh + review.** `node scripts/validate.mjs` (the same integrity
 gate CI runs before deploying — count, order, every asset, hashes), then
 `node scripts/today.mjs`, then eyeball a new wallpaper in
