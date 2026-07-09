@@ -65,6 +65,10 @@ function speakable(text) {
     .replace(/—/g, ', ')                  // em dashes read as pauses
     .replace(/\bc\.\s?(\d)/g, 'circa $1') // c. 1665
     .replace(/\bNo\.\s?(\d)/g, 'Number $1')
+    // Pronunciation pin: the model reads "Gogh" as American "Go" or
+    // guttural "Goth" at random, per chunk. Paul chose "Goth" (2026-07-08);
+    // the respell is spoken-script only and never reaches the screen.
+    .replace(/\bGogh\b/g, 'Goth')
     .replace(/\s+/g, ' ')
     .trim();
 }

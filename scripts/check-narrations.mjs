@@ -38,6 +38,7 @@ const speakable = (t) => t
   .replace(/—/g, ', ')
   .replace(/\bc\.\s?(\d)/g, 'circa $1')
   .replace(/\bNo\.\s?(\d)/g, 'Number $1')
+  .replace(/\bGogh\b/g, 'Goth')
   .replace(/\s+/g, ' ')
   .trim();
 const scriptFor = (i) =>
@@ -51,7 +52,8 @@ const words = (t) => t.toLowerCase()
   .replace(/\bno\.\s*(\d)/g, 'number $1')
   .replace(/[^a-z0-9' ]+/g, ' ')
   .split(/\s+/).filter(Boolean)
-  .map((w) => DIGITS[w] ?? w);
+  // ASR spells the coached name either way ("goth"/"gogh") — fold them.
+  .map((w) => w === 'gogh' ? 'goth' : (DIGITS[w] ?? w));
 
 function check(transcript, expected) {
   const tw = words(transcript);
