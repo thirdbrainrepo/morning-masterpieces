@@ -198,10 +198,18 @@ def main():
     ap.add_argument("--title", default="")
     ap.add_argument("--artist", default="")
     ap.add_argument("--year", default="")
+    # Fractional crop l,t,r,b (0-1) applied before composing — for museum
+    # photos that include conservation scaffolding (color-checker charts,
+    # easel clamps, annotation margins) around the canvas.
+    ap.add_argument("--crop", default="")
     ap.add_argument("--icon", action="store_true")
     args = ap.parse_args()
 
     img = Image.open(args.input).convert("RGB")
+    if args.crop:
+        l, t, r, b = (float(v) for v in args.crop.split(","))
+        img = img.crop((round(img.width * l), round(img.height * t),
+                        round(img.width * r), round(img.height * b)))
 
     if args.icon:
         make_icons(img, args.site_dir)

@@ -147,7 +147,17 @@ async function main() {
   const onlySlug = args.find((a) => a.startsWith('--slug='))?.slice(7);
 
   const manifest = JSON.parse(await readFile(path.join(SITE, 'artworks.json'), 'utf8'));
+  // The narration catalog spans the permanent collection AND exhibition
+  // works (exhibitions.json), deduped by slug.
   let items = manifest.items;
+  const exPath = path.join(SITE, 'exhibitions.json');
+  if (existsSync(exPath)) {
+    const ex = JSON.parse(await readFile(exPath, 'utf8'));
+    const have = new Set(items.map((i) => i.slug));
+    for (const e of ex.exhibitions ?? []) {
+      for (const item of e.items) if (!have.has(item.slug)) { items = items.concat(item); have.add(item.slug); }
+    }
+  }
 
   if (onlyToday) {
     const today = new Intl.DateTimeFormat('en-CA', {

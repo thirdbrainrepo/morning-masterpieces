@@ -45,6 +45,26 @@ for (const it of items) {
   seen.add(it.slug);
 }
 
+// Exhibitions: every roster item must be a fully valid catalog work with
+// all assets, and each exhibition's clock fields must be coherent.
+let exItems = [];
+try {
+  const ex = JSON.parse(await readFile(path.join(SITE, 'exhibitions.json'), 'utf8'));
+  for (const e of ex.exhibitions ?? []) {
+    check(!!e.id && !!e.title, `exhibition missing id/title`);
+    check(!Number.isNaN(Date.parse(e.opens)), `exhibition ${e.id}: bad opens date "${e.opens}"`);
+    check(e.count === e.items.length, `exhibition ${e.id}: count ${e.count} != items ${e.items.length}`);
+    const exSeen = new Set();
+    for (const it of e.items) {
+      check(it != null, `exhibition ${e.id}: null item (work failed to resolve at build?)`);
+      if (!it) continue;
+      check(!exSeen.has(it.slug), `exhibition ${e.id}: duplicate slug ${it.slug}`);
+      exSeen.add(it.slug);
+      if (!seen.has(it.slug)) { exItems.push(it); seen.add(it.slug); }
+    }
+  }
+} catch { /* exhibitions.json absent — permanent collection only */ }
+
 const REQUIRED = ['slug', 'title', 'artist', 'year', 'medium', 'movement', 'museum',
   'objectUrl', 'imageSourceUrl', 'license', 'image', 'zoom', 'audio',
   'wallpaper', 'wallpaperIpad', 'home', 'homeIpad', 'lesson', 'lookFor'];
@@ -55,7 +75,7 @@ const ASSETS = [['image', 20_000], ['zoom', 50_000], ['wallpaper', 100_000],
 
 const hashes = JSON.parse(await readFile(path.join(SITE, 'audio', 'hashes.json'), 'utf8'));
 
-for (const it of items) {
+for (const it of [...items, ...exItems]) {
   for (const f of REQUIRED) check(it[f] != null && it[f] !== '', `${it.slug}: missing field "${f}"`);
   for (const [f, min] of ASSETS) {
     const rel = it[f];
@@ -93,4 +113,5 @@ if (problems.length) {
   for (const p of problems) console.error(`  - ${p}`);
   process.exit(1);
 }
-console.log(`validate: ${items.length} works, ${items.length * ASSETS.length} assets, hashes, shell, index math — all OK`);
+const total = items.length + exItems.length;
+console.log(`validate: ${items.length} PC + ${exItems.length} exhibition works, ${total * ASSETS.length} assets, hashes, shell, index math — all OK`);

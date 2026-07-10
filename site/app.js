@@ -7,7 +7,16 @@
 
 const $ = (id) => document.getElementById(id);
 let manifest = null;
+let exhibitions = []; // from exhibitions.json; absent file = plain PC behavior
 let offset = 0; // days relative to today; 0 = today
+
+/* Rotation preference — the one piece of client state, and it is a
+   preference, not content: 'auto' follows an active exhibition, 'pc'
+   pins the daily to the permanent collection's own clock. */
+const ROTATION_PREF = 'mm-rotation';
+const rotationPref = () => {
+  try { return localStorage.getItem(ROTATION_PREF) ?? 'auto'; } catch { return 'auto'; }
+};
 
 function localYMD(date) {
   return new Intl.DateTimeFormat('en-CA', {
@@ -15,12 +24,37 @@ function localYMD(date) {
   }).format(date);
 }
 
+function daysSince(ymd, date) {
+  return Math.round((Date.parse(localYMD(date)) - Date.parse(ymd)) / 86_400_000);
+}
+
 function indexFor(date) {
-  const days = Math.round(
-    (Date.parse(localYMD(date)) - Date.parse(manifest.anchor)) / 86_400_000
-  );
+  const days = daysSince(manifest.anchor, date);
   const n = manifest.items.length;
   return ((days % n) + n) % n;
+}
+
+/* The exhibition whose run covers `date` (each runs once through, one work
+   per day from its opening; afterwards the permanent collection resumes). */
+function exhibitionOn(date) {
+  return exhibitions.find((e) => {
+    const d = daysSince(e.opens, date);
+    return d >= 0 && d < e.items.length;
+  }) ?? null;
+}
+
+/* MUST agree with scripts/today.mjs. */
+function rotationFor(date) {
+  const ex = rotationPref() === 'pc' ? null : exhibitionOn(date);
+  if (ex) {
+    const day = daysSince(ex.opens, date);
+    return {
+      item: ex.items[day],
+      label: `${ex.title} · Day ${day + 1} of ${ex.items.length}`,
+    };
+  }
+  const idx = indexFor(date);
+  return { item: manifest.items[idx], label: `No. ${idx + 1} of ${manifest.items.length}` };
 }
 
 // The browsed date, `offset` calendar days from today. Not timestamp math:
@@ -32,20 +66,29 @@ function viewedDate() {
 }
 
 function currentItem() {
-  return manifest.items[indexFor(viewedDate())];
+  return rotationFor(viewedDate()).item;
 }
 
 function render() {
   const date = viewedDate();
-  const idx = indexFor(date);
-  const item = manifest.items[idx];
+  const { item, label } = rotationFor(date);
 
   stopDocent(); // navigation ends the current reading
 
   $('dateline').textContent = date.toLocaleDateString(undefined, {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
   });
-  $('daycount').textContent = `No. ${idx + 1} of ${manifest.items.length}`;
+  $('daycount').textContent = label;
+
+  // The permanent-collection toggle only exists while an exhibition is on.
+  const exToday = exhibitionOn(date);
+  const toggle = $('rotation-toggle');
+  toggle.hidden = !exToday;
+  if (exToday) {
+    toggle.textContent = rotationPref() === 'pc'
+      ? `Return to “${exToday.title}”`
+      : 'View the permanent collection instead';
+  }
 
   const img = $('art-image');
   img.src = item.image;
@@ -293,8 +336,12 @@ function maybeRollover() {
 }
 
 async function init() {
-  const res = await fetch('artworks.json');
+  const [res, exRes] = await Promise.all([
+    fetch('artworks.json'),
+    fetch('exhibitions.json').catch(() => null),
+  ]);
   manifest = await res.json();
+  exhibitions = exRes?.ok ? (await exRes.json()).exhibitions ?? [] : [];
   renderedYMD = localYMD(new Date());
 
   $('main').hidden = false;
@@ -307,6 +354,12 @@ async function init() {
     openLightbox();
   }
 
+  $('rotation-toggle').addEventListener('click', () => {
+    try {
+      localStorage.setItem(ROTATION_PREF, rotationPref() === 'pc' ? 'auto' : 'pc');
+    } catch { /* private browsing: toggle lives for the session render only */ }
+    render();
+  });
   $('prev-btn').addEventListener('click', () => { offset -= 1; render(); });
   $('next-btn').addEventListener('click', () => { offset += 1; render(); });
   $('today-btn').addEventListener('click', () => { offset = 0; render(); });

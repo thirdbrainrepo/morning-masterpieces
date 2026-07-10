@@ -95,7 +95,15 @@ function check(transcript, expected) {
 
 const onlySlug = process.argv.find((a) => a.startsWith('--slug='))?.slice(7);
 const manifest = JSON.parse(await readFile(path.join(ROOT, 'site/artworks.json'), 'utf8'));
-const queue = manifest.items.filter((i) => !onlySlug || i.slug === onlySlug);
+let allItems = manifest.items;
+try {
+  const ex = JSON.parse(await readFile(path.join(ROOT, 'site/exhibitions.json'), 'utf8'));
+  const have = new Set(allItems.map((i) => i.slug));
+  for (const e of ex.exhibitions ?? []) {
+    for (const item of e.items) if (!have.has(item.slug)) { allItems = allItems.concat(item); have.add(item.slug); }
+  }
+} catch { /* no exhibitions.json yet */ }
+const queue = allItems.filter((i) => !onlySlug || i.slug === onlySlug);
 if (!queue.length) throw new Error(`no such slug: ${onlySlug}`);
 
 await run('mkdir', ['-p', TMP]);

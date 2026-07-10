@@ -22,6 +22,14 @@ import { promisify } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { seeds } from '../data/seeds.mjs';
+import { exhibitions } from '../data/exhibitions.mjs';
+
+// The full catalog: permanent collection + every exhibition's works, deduped
+// by slug (exhibitions may reuse catalog works). Only PC seeds define the
+// rotation in artworks.json; exhibition rosters go to exhibitions.json.
+const catalog = [...new Map(
+  [...seeds, ...exhibitions.flatMap((e) => e.seeds)].map((s) => [s.slug, s])
+).values()];
 
 const run = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -201,6 +209,7 @@ async function processImages(seed, original) {
   await run(PYTHON, [
     PROCESS, original, SITE, seed.slug,
     '--title', seed.title, '--artist', seed.artist, '--year', seed.year,
+    ...(seed.crop ? ['--crop', seed.crop.join(',')] : []),
   ]);
   return 'processed';
 }
@@ -247,8 +256,8 @@ async function main() {
 
   // Museum APIs tolerate mild concurrency; Wikimedia's thumbnailer rate-limits
   // aggressively, so Commons goes one at a time with a courtesy pause.
-  const museumSeeds = seeds.filter((s) => s.source !== 'commons');
-  const commonsSeeds = seeds.filter((s) => s.source === 'commons');
+  const museumSeeds = catalog.filter((s) => s.source !== 'commons');
+  const commonsSeeds = catalog.filter((s) => s.source === 'commons');
   const [museumResults, commonsResults] = await Promise.all([
     mapLimit(museumSeeds, 4, processSeed),
     mapLimit(commonsSeeds, 1, async (seed) => {
@@ -260,7 +269,7 @@ async function main() {
   const bySlug = new Map(
     [...museumResults, ...commonsResults].map((r) => [r.seed.slug, r])
   );
-  const results = seeds.map((s) => bySlug.get(s.slug));
+  const results = catalog.map((s) => bySlug.get(s.slug));
 
   const ok = results.filter((r) => !r.error);
   const failed = results.filter((r) => r.error);
@@ -270,7 +279,7 @@ async function main() {
     const detail = r.error ?? `${r.status}  <- "${(r.resolved.fetchedTitle ?? '').slice(0, 60)}"`;
     console.log(`[${tag}] ${r.seed.slug.padEnd(34)} ${r.seed.source.padEnd(8)} ${detail}`);
   }
-  console.log(`\n${ok.length}/${seeds.length} resolved${failed.length ? `, ${failed.length} FAILED` : ''}`);
+  console.log(`\n${ok.length}/${catalog.length} resolved${failed.length ? `, ${failed.length} FAILED` : ''}`);
 
   // Fail closed BEFORE touching the manifest: writing only the successful
   // works would shrink the rotation, remapping every future day — a
@@ -289,7 +298,7 @@ async function main() {
     await run(PYTHON, [PROCESS, iconSource, SITE, 'icon', '--icon']);
   }
 
-  const items = ok.map(({ seed, resolved }) => ({
+  const itemBySlug = new Map(ok.map(({ seed, resolved }) => [seed.slug, {
     slug: seed.slug,
     title: seed.title,
     artist: seed.artist,
@@ -310,11 +319,28 @@ async function main() {
     homeIpad: `images/home-ipad/${seed.slug}.jpg`,
     lesson: seed.lesson.trim(),
     lookFor: seed.lookFor.trim(),
-  }));
+  }]));
 
+  // artworks.json is the permanent collection ONLY — its length is the PC
+  // rotation length and must not move when exhibitions come and go.
+  const items = seeds.map((s) => itemBySlug.get(s.slug));
   const manifest = { version: 1, anchor: '2026-01-01', count: items.length, items };
   await writeFile(path.join(SITE, 'artworks.json'), JSON.stringify(manifest, null, 1));
   console.log(`wrote site/artworks.json (${items.length} artworks)`);
+
+  const exManifest = {
+    version: 1,
+    exhibitions: exhibitions.map((e) => ({
+      id: e.id,
+      title: e.title,
+      tagline: e.tagline,
+      opens: e.opens,
+      count: e.seeds.length,
+      items: e.seeds.map((s) => itemBySlug.get(s.slug)),
+    })),
+  };
+  await writeFile(path.join(SITE, 'exhibitions.json'), JSON.stringify(exManifest, null, 1));
+  console.log(`wrote site/exhibitions.json (${exhibitions.length} exhibition(s), ${exhibitions.reduce((n, e) => n + e.seeds.length, 0)} works)`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

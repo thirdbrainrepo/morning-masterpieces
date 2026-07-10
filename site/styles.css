@@ -49,6 +49,25 @@ body {
   margin: 0.35rem 0;
 }
 
+/* Quiet text button under the daycount — present only during exhibitions. */
+.rotation-toggle {
+  font-family: -apple-system, system-ui, sans-serif;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  border-bottom: 1px solid transparent;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.1rem;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+}
+.rotation-toggle:hover, .rotation-toggle:active {
+  color: var(--ink-dim);
+  border-bottom-color: var(--hairline);
+}
+
 main { animation: fade 0.5s ease; }
 @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
 
