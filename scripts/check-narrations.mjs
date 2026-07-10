@@ -74,6 +74,20 @@ function check(transcript, expected) {
     }
     if (!seen.has(g)) seen.set(g, i);
   }
+  // Abrupt stutters double a phrase back-to-back and can be SHORT — a
+  // 3-word doubling sits under the 5-gram window above (missed "this one
+  // exalts this one exalts", 2026-07-10). Whitelist doublings the source
+  // text itself contains.
+  const ejoined = ew.join(' ');
+  outer: for (let n = 3; n <= 8; n++) {
+    for (let i = 0; i + 2 * n <= tw.length; i++) {
+      const a = tw.slice(i, i + n).join(' ');
+      if (a === tw.slice(i + n, i + 2 * n).join(' ') && !ejoined.includes(`${a} ${a}`)) {
+        flags.push(`STUTTER: "${a}" doubled back-to-back`);
+        break outer;
+      }
+    }
+  }
   if (ratio < 0.93) flags.push(`SHORT: ${tw.length}/${ew.length} words (${ratio.toFixed(2)}) — content likely dropped`);
   if (ratio > 1.10) flags.push(`LONG: ${tw.length}/${ew.length} words (${ratio.toFixed(2)}) — content likely repeated`);
   return { ratio, flags };
