@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Monet and Venice — a companion</title>
+  <meta name="description" content="An in-gallery audio companion for Monet and Venice at the de Young Museum.">
+  <meta name="theme-color" content="#12100d">
+  <link rel="icon" href="../icons/icon-192.png">
+  <!-- Standalone page: deliberately does NOT use ../styles.css (the app's
+       wide layout locks page scroll). All styles inline. -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --wall: #12100d; --raised: #1a1713; --ink: #e8e3d8; --dim: #a49c8c;
+      --faint: #6e675b; --line: #2e2a24; --accent: #c8a96e;
+    }
+    body {
+      background: var(--wall); color: var(--ink);
+      font-family: 'Palatino', 'Georgia', serif; line-height: 1.6;
+      max-width: 680px; margin: 0 auto;
+      padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 3rem);
+    }
+    header { text-align: center; margin-bottom: 1.8rem; }
+    .eyebrow {
+      font-family: -apple-system, system-ui, sans-serif; font-size: 0.7rem;
+      font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint);
+    }
+    h1 { font-size: 1.5rem; font-weight: 500; font-style: italic; color: var(--accent); margin: 0.4rem 0 0.2rem; }
+    .sub { color: var(--dim); font-size: 0.95rem; }
+    .offline {
+      background: var(--raised); border: 1px solid var(--line); border-radius: 10px;
+      padding: 1rem 1.2rem; margin-bottom: 1.8rem; text-align: center;
+    }
+    .offline p { font-size: 0.88rem; color: var(--dim); margin-bottom: 0.7rem; }
+    .offline button {
+      font-family: -apple-system, system-ui, sans-serif; font-size: 0.9rem; font-weight: 600;
+      color: #1a1408; background: var(--accent); border: none; border-radius: 8px;
+      padding: 0.7rem 1.4rem; cursor: pointer;
+    }
+    .offline button:disabled { opacity: 0.55; }
+    #dl-status { margin-top: 0.6rem; margin-bottom: 0; font-size: 0.82rem; color: var(--faint); }
+    ol { list-style: none; counter-reset: stop -1; }
+    li.stop {
+      counter-increment: stop;
+      border-top: 1px solid var(--line); padding: 1.1rem 0 1.3rem;
+    }
+    li.stop h2 {
+      font-size: 1.08rem; font-weight: 500; margin-bottom: 0.6rem;
+    }
+    li.stop h2::before {
+      content: counter(stop, decimal-leading-zero);
+      font-family: -apple-system, system-ui, sans-serif; font-size: 0.72rem; font-weight: 600;
+      color: var(--accent); letter-spacing: 0.1em; margin-right: 0.7rem; vertical-align: 0.12em;
+    }
+    audio { width: 100%; height: 40px; }
+    footer {
+      border-top: 1px solid var(--line); padding-top: 1.2rem; margin-top: 0.5rem;
+      font-size: 0.78rem; color: var(--faint); text-align: center;
+    }
+    footer a { color: var(--dim); }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="eyebrow">A Gallery Companion</p>
+    <h1>Monet and Venice</h1>
+    <p class="sub">de Young Museum · Herbst Galleries · through July 26, 2026</p>
+  </header>
+
+  <div class="offline">
+    <p>Museum basements eat phone signal. Save the whole tour to this device
+    before you go in — then even airplane mode can't stop the docent.</p>
+    <button id="dl-btn" type="button">Save tour for offline</button>
+    <p id="dl-status"></p>
+  </div>
+
+  <ol id="stops"></ol>
+
+  <footer>
+    <p>Stops follow the exhibition's flow; hangs shift, so let the room order
+    guide you and the titles find you. Written and voiced by the
+    <a href="../">Morning Masterpieces</a> docent.</p>
+  </footer>
+
+  <script>
+    const STOPS = [
+      ['00-overture', 'Before you go in'],
+      ['01-early-water', 'The Seine, first'],
+      ['02-normandy', 'Weather on the coast'],
+      ['03-london', 'London: the dress rehearsal'],
+      ['04-giverny-before', 'The bridge at Giverny'],
+      ['05-canaletto', 'Canaletto: Venice measured'],
+      ['06-turner', 'Turner: Venice dissolving'],
+      ['07-whistler', 'Whistler: Venice after dark'],
+      ['08-sargent', 'Sargent: the insider'],
+      ['09-signac-predecessors', 'The supporting cast, and a gift'],
+      ['10-tourists', 'Two tourists from Giverny'],
+      ['11-grand-canal', 'The Grand Canal — one of ours'],
+      ['12-salute-rio', 'The Salute, and a canal with trees'],
+      ['13-palazzi', 'The palaces: portraits without faces'],
+      ['14-ducale', 'The Doge’s Palace, in chorus'],
+      ['15-san-giorgio-dusk', 'San Giorgio at dusk — the reunion'],
+      ['16-water-lilies', 'After Venice: the pond'],
+      ['17-coda', 'On the way out'],
+    ];
+
+    const list = document.getElementById('stops');
+    for (const [id, title] of STOPS) {
+      const li = document.createElement('li');
+      li.className = 'stop';
+      const h = document.createElement('h2');
+      h.textContent = title;
+      const a = document.createElement('audio');
+      a.controls = true;
+      a.preload = 'none';
+      a.src = 'audio/' + id + '.m4a';
+      li.append(h, a);
+      list.appendChild(li);
+    }
+
+    // Only one stop plays at a time — museum etiquette.
+    document.addEventListener('play', (e) => {
+      for (const a of document.querySelectorAll('audio')) {
+        if (a !== e.target) a.pause();
+      }
+    }, true);
+
+    /* "Save for offline": fetch every track once so the service worker's
+       cache-first audio handling owns them. The page shell itself is cached
+       network-first on load. */
+    const btn = document.getElementById('dl-btn');
+    const status = document.getElementById('dl-status');
+    if (localStorage.getItem('visit-monet-venice-saved') === 'yes') {
+      status.textContent = 'Saved on this device. Airplane mode is fine.';
+    }
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      let done = 0;
+      try {
+        for (const [id] of STOPS) {
+          status.textContent = 'Saving ' + (done + 1) + ' of ' + STOPS.length + '…';
+          const res = await fetch('audio/' + id + '.m4a');
+          if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + id);
+          await res.blob();
+          done++;
+        }
+        localStorage.setItem('visit-monet-venice-saved', 'yes');
+        status.textContent = 'All ' + STOPS.length + ' stops saved. Airplane mode is fine.';
+      } catch (err) {
+        status.textContent = 'Stopped at ' + done + '/' + STOPS.length + ' — check connection and tap again.';
+        btn.disabled = false;
+      }
+    });
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(() => {});
+    }
+  </script>
+</body>
+</html>
