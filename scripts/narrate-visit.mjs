@@ -71,6 +71,18 @@ async function main() {
   const stops = visit.stops.filter((s) => !onlyStop || s.id === onlyStop);
   if (!stops.length) throw new Error(`no such stop: ${onlyStop}`);
 
+  // The page renders itself from this manifest — texts stay single-sourced
+  // in data/visit/ and travel with the audio.
+  await mkdir(path.dirname(HASHES), { recursive: true });
+  await writeFile(path.join(ROOT, 'site', 'visit', 'monet-venice.json'), JSON.stringify({
+    id: visit.id,
+    title: visit.title,
+    venue: visit.venue,
+    closes: visit.closes,
+    stops: visit.stops.map(({ id, title, text }) => ({ id, title, text })),
+  }, null, 1));
+  console.log('wrote site/visit/monet-venice.json');
+
   const up = await fetch('http://localhost:8100/docs').then((r) => r.ok).catch(() => false);
   if (!up) throw new Error('Chatterbox TTS server is not running on localhost:8100');
 

@@ -21,13 +21,20 @@
       max-width: 680px; margin: 0 auto;
       padding: calc(env(safe-area-inset-top) + 1.5rem) 1.25rem calc(env(safe-area-inset-bottom) + 3rem);
     }
-    header { text-align: center; margin-bottom: 1.8rem; }
+    header { text-align: center; margin-bottom: 1.4rem; }
     .eyebrow {
       font-family: -apple-system, system-ui, sans-serif; font-size: 0.7rem;
       font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint);
     }
     h1 { font-size: 1.5rem; font-weight: 500; font-style: italic; color: var(--accent); margin: 0.4rem 0 0.2rem; }
     .sub { color: var(--dim); font-size: 0.95rem; }
+    .intro {
+      border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+      padding: 1.1rem 0.2rem; margin-bottom: 1.4rem;
+      font-size: 0.98rem; color: var(--dim);
+    }
+    .intro p + p { margin-top: 0.7rem; }
+    .intro a { color: var(--accent); }
     .offline {
       background: var(--raised); border: 1px solid var(--line); border-radius: 10px;
       padding: 1rem 1.2rem; margin-bottom: 1.8rem; text-align: center;
@@ -45,15 +52,28 @@
       counter-increment: stop;
       border-top: 1px solid var(--line); padding: 1.1rem 0 1.3rem;
     }
-    li.stop h2 {
-      font-size: 1.08rem; font-weight: 500; margin-bottom: 0.6rem;
-    }
+    li.stop h2 { font-size: 1.08rem; font-weight: 500; margin-bottom: 0.6rem; }
     li.stop h2::before {
       content: counter(stop, decimal-leading-zero);
       font-family: -apple-system, system-ui, sans-serif; font-size: 0.72rem; font-weight: 600;
       color: var(--accent); letter-spacing: 0.1em; margin-right: 0.7rem; vertical-align: 0.12em;
     }
     audio { width: 100%; height: 40px; }
+    details.transcript { margin-top: 0.55rem; }
+    details.transcript summary {
+      font-family: -apple-system, system-ui, sans-serif; font-size: 0.78rem;
+      letter-spacing: 0.04em; color: var(--faint); cursor: pointer;
+      list-style: none; display: inline-block;
+      border-bottom: 1px solid transparent; padding-bottom: 0.1rem;
+    }
+    details.transcript summary::-webkit-details-marker { display: none; }
+    details.transcript summary::before { content: '▸ '; color: var(--accent); }
+    details.transcript[open] summary::before { content: '▾ '; }
+    details.transcript summary:hover { color: var(--dim); border-bottom-color: var(--line); }
+    details.transcript p {
+      margin-top: 0.6rem; font-size: 0.96rem; color: var(--dim);
+      border-left: 2px solid var(--line); padding-left: 0.9rem;
+    }
     footer {
       border-top: 1px solid var(--line); padding-top: 1.2rem; margin-top: 0.5rem;
       font-size: 0.78rem; color: var(--faint); text-align: center;
@@ -67,6 +87,20 @@
     <h1>Monet and Venice</h1>
     <p class="sub">de Young Museum · Herbst Galleries · through July 26, 2026</p>
   </header>
+
+  <div class="intro">
+    <p>In the autumn of 1908, a sixty-eight-year-old who had spent decades
+    insisting Venice was too beautiful to be painted finally got on the
+    train — and painted it thirty-seven times. More of those canvases hang
+    together downstairs at the de Young than at any time since 1912. This
+    companion walks the show's rooms in order: eighteen short stops in the
+    docent's voice, each about a minute — listen as you arrive at each
+    room, and let the paintings find you. Every stop also carries its text,
+    for quiet galleries and second readings.</p>
+    <p>Exhibition details, tickets, and hours:
+    <a href="https://www.famsf.org/exhibitions/monet-venice" rel="noopener">the
+    official <em>Monet and Venice</em> page at the de&nbsp;Young&nbsp;→</a></p>
+  </div>
 
   <div class="offline">
     <p>Museum basements eat phone signal. Save the whole tour to this device
@@ -84,40 +118,37 @@
   </footer>
 
   <script>
-    const STOPS = [
-      ['00-overture', 'Before you go in'],
-      ['01-early-water', 'The Seine, first'],
-      ['02-normandy', 'Weather on the coast'],
-      ['03-london', 'London: the dress rehearsal'],
-      ['04-giverny-before', 'The bridge at Giverny'],
-      ['05-canaletto', 'Canaletto: Venice measured'],
-      ['06-turner', 'Turner: Venice dissolving'],
-      ['07-whistler', 'Whistler: Venice after dark'],
-      ['08-sargent', 'Sargent: the insider'],
-      ['09-signac-predecessors', 'The supporting cast, and a gift'],
-      ['10-tourists', 'Two tourists from Giverny'],
-      ['11-grand-canal', 'The Grand Canal — one of ours'],
-      ['12-salute-rio', 'The Salute, and a canal with trees'],
-      ['13-palazzi', 'The palaces: portraits without faces'],
-      ['14-ducale', 'The Doge’s Palace, in chorus'],
-      ['15-san-giorgio-dusk', 'San Giorgio at dusk — the reunion'],
-      ['16-water-lilies', 'After Venice: the pond'],
-      ['17-coda', 'On the way out'],
-    ];
-
     const list = document.getElementById('stops');
-    for (const [id, title] of STOPS) {
-      const li = document.createElement('li');
-      li.className = 'stop';
-      const h = document.createElement('h2');
-      h.textContent = title;
-      const a = document.createElement('audio');
-      a.controls = true;
-      a.preload = 'none';
-      a.src = 'audio/' + id + '.m4a';
-      li.append(h, a);
-      list.appendChild(li);
+    const btn = document.getElementById('dl-btn');
+    const status = document.getElementById('dl-status');
+    let stops = [];
+
+    async function init() {
+      const res = await fetch('monet-venice.json');
+      stops = (await res.json()).stops;
+      for (const stop of stops) {
+        const li = document.createElement('li');
+        li.className = 'stop';
+        const h = document.createElement('h2');
+        h.textContent = stop.title;
+        const a = document.createElement('audio');
+        a.controls = true;
+        a.preload = 'none';
+        a.src = 'audio/' + stop.id + '.m4a';
+        const d = document.createElement('details');
+        d.className = 'transcript';
+        const s = document.createElement('summary');
+        s.textContent = 'Read this stop';
+        const p = document.createElement('p');
+        p.textContent = stop.text;
+        d.append(s, p);
+        li.append(h, a, d);
+        list.appendChild(li);
+      }
     }
+    init().catch(() => {
+      status.textContent = 'Could not load the tour — check your connection once and reload.';
+    });
 
     // Only one stop plays at a time — museum etiquette.
     document.addEventListener('play', (e) => {
@@ -127,10 +158,8 @@
     }, true);
 
     /* "Save for offline": fetch every track once so the service worker's
-       cache-first audio handling owns them. The page shell itself is cached
-       network-first on load. */
-    const btn = document.getElementById('dl-btn');
-    const status = document.getElementById('dl-status');
+       cache-first audio handling owns them. The page shell and stop
+       manifest cache network-first on load. */
     if (localStorage.getItem('visit-monet-venice-saved') === 'yes') {
       status.textContent = 'Saved on this device. Airplane mode is fine.';
     }
@@ -138,17 +167,17 @@
       btn.disabled = true;
       let done = 0;
       try {
-        for (const [id] of STOPS) {
-          status.textContent = 'Saving ' + (done + 1) + ' of ' + STOPS.length + '…';
-          const res = await fetch('audio/' + id + '.m4a');
-          if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + id);
+        for (const stop of stops) {
+          status.textContent = 'Saving ' + (done + 1) + ' of ' + stops.length + '…';
+          const res = await fetch('audio/' + stop.id + '.m4a');
+          if (!res.ok) throw new Error('HTTP ' + res.status + ' on ' + stop.id);
           await res.blob();
           done++;
         }
         localStorage.setItem('visit-monet-venice-saved', 'yes');
-        status.textContent = 'All ' + STOPS.length + ' stops saved. Airplane mode is fine.';
+        status.textContent = 'All ' + stops.length + ' stops saved. Airplane mode is fine.';
       } catch (err) {
-        status.textContent = 'Stopped at ' + done + '/' + STOPS.length + ' — check connection and tap again.';
+        status.textContent = 'Stopped at ' + done + '/' + stops.length + ' — check connection and tap again.';
         btn.disabled = false;
       }
     });
