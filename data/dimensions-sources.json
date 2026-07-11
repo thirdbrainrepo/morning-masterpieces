@@ -1,0 +1,432 @@
+{
+ "works": [
+  {
+   "slug": "van-eyck-arnolfini",
+   "height_cm": 82.2,
+   "width_cm": 60,
+   "source": "Wikidata Q220859 via Commons P6243 (matches National Gallery London)",
+   "confidence": "high"
+  },
+  {
+   "slug": "botticelli-birth-of-venus",
+   "height_cm": 172.5,
+   "width_cm": 278.5,
+   "source": "Wikidata Q151047 via Commons P6243 (matches Uffizi)",
+   "confidence": "high"
+  },
+  {
+   "slug": "bosch-garden-earthly-delights",
+   "height_cm": 205.5,
+   "width_cm": 384.9,
+   "source": "Wikidata Q321303 preferred-rank claims = Prado official, full open triptych",
+   "confidence": "high"
+  },
+  {
+   "slug": "durer-young-hare",
+   "height_cm": 25,
+   "width_cm": 22.5,
+   "source": "Wikidata Q699388 via Commons P6243 (Albertina publishes 25.1 x 22.6)",
+   "confidence": "high"
+  },
+  {
+   "slug": "leonardo-mona-lisa",
+   "height_cm": 79.4,
+   "width_cm": 53.4,
+   "source": "Wikidata Q12418 via Commons P6243 (Louvre modern panel measurement; 77 x 53 is the older commonly cited figure)",
+   "confidence": "high"
+  },
+  {
+   "slug": "michelangelo-creation-of-adam",
+   "height_cm": 280,
+   "width_cm": 570,
+   "source": "approximate fresco-section size per task spec (Sistine ceiling panel)",
+   "confidence": "low"
+  },
+  {
+   "slug": "raphael-school-of-athens",
+   "height_cm": 500,
+   "width_cm": 770,
+   "source": "approximate fresco size per task spec (Stanza della Segnatura, width at base ~770)",
+   "confidence": "low"
+  },
+  {
+   "slug": "titian-venus-of-urbino",
+   "height_cm": 119,
+   "width_cm": 165.5,
+   "source": "Wikidata Q727875 via Commons P6243 (matches Uffizi)",
+   "confidence": "high"
+  },
+  {
+   "slug": "bruegel-harvesters",
+   "height_cm": 119.1,
+   "width_cm": 161.9,
+   "source": "Met API object 435809, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "el-greco-view-of-toledo",
+   "height_cm": 121.3,
+   "width_cm": 108.6,
+   "source": "Met API object 436575, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "caravaggio-calling-st-matthew",
+   "height_cm": 340,
+   "width_cm": 322,
+   "source": "Wikidata Q969377 via Commons P6243",
+   "confidence": "high"
+  },
+  {
+   "slug": "gentileschi-judith-holofernes",
+   "height_cm": 199,
+   "width_cm": 162.5,
+   "source": "Wikidata Q3769169 via Commons P6243 (Uffizi version)",
+   "confidence": "high"
+  },
+  {
+   "slug": "leyster-self-portrait",
+   "height_cm": 74.6,
+   "width_cm": 65.1,
+   "source": "Wikidata Q18888002 via Commons P6243 (matches NGA)",
+   "confidence": "high"
+  },
+  {
+   "slug": "rembrandt-night-watch",
+   "height_cm": 363,
+   "width_cm": 437,
+   "source": "Wikidata Q219831 via Commons P6243 (matches Rijksmuseum)",
+   "confidence": "high"
+  },
+  {
+   "slug": "velazquez-las-meninas",
+   "height_cm": 318,
+   "width_cm": 276,
+   "source": "Wikidata Q208758 via Commons P6243 (matches Prado)",
+   "confidence": "high"
+  },
+  {
+   "slug": "vermeer-milkmaid",
+   "height_cm": 45.5,
+   "width_cm": 41,
+   "source": "Wikidata Q167605 via Commons P6243 (matches Rijksmuseum)",
+   "confidence": "high"
+  },
+  {
+   "slug": "rembrandt-self-portrait-1660",
+   "height_cm": 80.3,
+   "width_cm": 67.3,
+   "source": "Met API object 437397, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "vermeer-girl-pearl-earring",
+   "height_cm": 44.5,
+   "width_cm": 39,
+   "source": "Wikidata Q185372 via Commons P6243 (matches Mauritshuis)",
+   "confidence": "high"
+  },
+  {
+   "slug": "fragonard-the-swing",
+   "height_cm": 81,
+   "width_cm": 64.2,
+   "source": "Wikidata Q2629559 via Commons P6243 (matches Wallace Collection)",
+   "confidence": "high"
+  },
+  {
+   "slug": "david-death-of-socrates",
+   "height_cm": 129.5,
+   "width_cm": 196.2,
+   "source": "Met API object 436105, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "goya-third-of-may",
+   "height_cm": 268,
+   "width_cm": 347,
+   "source": "Wikidata Q1091086 via Commons P6243 (matches Prado)",
+   "confidence": "high"
+  },
+  {
+   "slug": "friedrich-wanderer",
+   "height_cm": 94.8,
+   "width_cm": 74.8,
+   "source": "Wikidata Q311243 via Commons P6243 (matches Hamburger Kunsthalle)",
+   "confidence": "high"
+  },
+  {
+   "slug": "delacroix-liberty",
+   "height_cm": 260,
+   "width_cm": 325,
+   "source": "Wikidata Q29530 via Commons P6243 (matches Louvre)",
+   "confidence": "high"
+  },
+  {
+   "slug": "hokusai-great-wave",
+   "height_cm": 25.7,
+   "width_cm": 37.9,
+   "source": "Met API object 45434, measurements[Overall] — oban print sheet",
+   "confidence": "high"
+  },
+  {
+   "slug": "cole-oxbow",
+   "height_cm": 130.8,
+   "width_cm": 193,
+   "source": "Met API object 10497, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "turner-fighting-temeraire",
+   "height_cm": 90.7,
+   "width_cm": 121.6,
+   "source": "Wikidata Q257580 via Commons P6243 (matches National Gallery London)",
+   "confidence": "high"
+  },
+  {
+   "slug": "leutze-washington-crossing",
+   "height_cm": 378.5,
+   "width_cm": 647.7,
+   "source": "Met API object 11417, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "millet-gleaners",
+   "height_cm": 83,
+   "width_cm": 110,
+   "source": "Wikidata Q1368055 via Commons P6243 (Orsay publishes 83.5 x 110)",
+   "confidence": "high"
+  },
+  {
+   "slug": "hiroshige-sudden-shower",
+   "height_cm": 34,
+   "width_cm": 24.1,
+   "source": "Met API object 36461, measurements[Overall] — vertical oban print, Met's single listed measurement",
+   "confidence": "high"
+  },
+  {
+   "slug": "whistler-mother",
+   "height_cm": 144.3,
+   "width_cm": 163,
+   "source": "Wikidata Q687182 via Commons P6243 (Orsay publishes 144.3 x 162.4)",
+   "confidence": "high"
+  },
+  {
+   "slug": "monet-impression-sunrise",
+   "height_cm": 48,
+   "width_cm": 63,
+   "source": "Wikidata Q328523 via Commons P6243 (matches Marmottan)",
+   "confidence": "high"
+  },
+  {
+   "slug": "morisot-cradle",
+   "height_cm": 56,
+   "width_cm": 46.5,
+   "source": "Wikidata Q5966403 via Commons P6243 (Orsay publishes 56 x 46)",
+   "confidence": "high"
+  },
+  {
+   "slug": "degas-dance-class",
+   "height_cm": 83.5,
+   "width_cm": 77.2,
+   "source": "Met API object 438817, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "caillebotte-paris-street",
+   "height_cm": 212.2,
+   "width_cm": 276.2,
+   "source": "AIC API artwork 20684, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "renoir-boating-party",
+   "height_cm": 130.2,
+   "width_cm": 175.6,
+   "source": "Wikidata Q1167907 via Commons P6243 (matches Phillips Collection)",
+   "confidence": "high"
+  },
+  {
+   "slug": "manet-bar-folies-bergere",
+   "height_cm": 96,
+   "width_cm": 130,
+   "source": "Wikidata Q1245354 via Commons P6243 (matches Courtauld)",
+   "confidence": "high"
+  },
+  {
+   "slug": "sargent-madame-x",
+   "height_cm": 208.6,
+   "width_cm": 109.9,
+   "source": "Met API object 12127, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "seurat-grande-jatte",
+   "height_cm": 207.5,
+   "width_cm": 308.1,
+   "source": "AIC API artwork 27992, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "van-gogh-bedroom",
+   "height_cm": 73.6,
+   "width_cm": 92.3,
+   "source": "AIC API artwork 28560, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "van-gogh-starry-night",
+   "height_cm": 73.7,
+   "width_cm": 92.1,
+   "source": "Wikidata Q45585 via Commons P6243 (matches MoMA)",
+   "confidence": "high"
+  },
+  {
+   "slug": "van-gogh-wheat-field-cypresses",
+   "height_cm": 73.2,
+   "width_cm": 93.4,
+   "source": "Met API object 436535, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "munch-scream",
+   "height_cm": 91,
+   "width_cm": 73.5,
+   "source": "Wikidata Q18891156 via Commons P6243 (1893 Oslo version)",
+   "confidence": "high"
+  },
+  {
+   "slug": "cezanne-basket-of-apples",
+   "height_cm": 65,
+   "width_cm": 80,
+   "source": "AIC API artwork 111436, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "cassatt-childs-bath",
+   "height_cm": 101.3,
+   "width_cm": 67.3,
+   "source": "AIC API artwork 111442, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "toulouse-lautrec-moulin-rouge",
+   "height_cm": 123,
+   "width_cm": 141,
+   "source": "AIC API artwork 61128, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "rousseau-sleeping-gypsy",
+   "height_cm": 129.5,
+   "width_cm": 200.7,
+   "source": "Wikidata Q1219263 via Commons P6243 (matches MoMA)",
+   "confidence": "high"
+  },
+  {
+   "slug": "homer-gulf-stream",
+   "height_cm": 71.4,
+   "width_cm": 124.8,
+   "source": "Met API object 11122, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "monet-water-lilies",
+   "height_cm": 89.9,
+   "width_cm": 94.1,
+   "source": "AIC API artwork 16568, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "klimt-the-kiss",
+   "height_cm": 180,
+   "width_cm": 180,
+   "source": "Wikidata Q698487 via Commons P6243 (matches Belvedere)",
+   "confidence": "high"
+  },
+  {
+   "slug": "kandinsky-improvisation-30",
+   "height_cm": 111,
+   "width_cm": 111.3,
+   "source": "AIC API artwork 8991, dimensions field",
+   "confidence": "high"
+  },
+  {
+   "slug": "canaletto-grand-canal-rialto",
+   "height_cm": 46.4,
+   "width_cm": 77.5,
+   "source": "Met API object 438100, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "guardi-santa-maria-salute",
+   "height_cm": 53.3,
+   "width_cm": 85.7,
+   "source": "Met API object 436598, measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "turner-venice-salute-porch",
+   "height_cm": 91.4,
+   "width_cm": 122.2,
+   "source": "Met API object 437853 (seed is commons but objectUrl is this Met object), measurements[Overall]",
+   "confidence": "high"
+  },
+  {
+   "slug": "turner-approach-to-venice",
+   "height_cm": 62,
+   "width_cm": 94,
+   "source": "Wikidata Q20187111 via Commons P6243 (NGA 117)",
+   "confidence": "high"
+  },
+  {
+   "slug": "whistler-nocturne-lagoon-venice",
+   "height_cm": 50.2,
+   "width_cm": 65.4,
+   "source": "Wikidata Q20635123 via Commons P6243 (matches MFA Boston)",
+   "confidence": "high"
+  },
+  {
+   "slug": "manet-grand-canal-blue-venice",
+   "height_cm": 54,
+   "width_cm": 65,
+   "source": "Wikidata Q79868509 via Commons P6243, agreed by Wikipedia list of Manet paintings; Shelburne Museum page not directly verifiable",
+   "confidence": "medium"
+  },
+  {
+   "slug": "renoir-venice-doges-palace",
+   "height_cm": 54.5,
+   "width_cm": 65.7,
+   "source": "Clark Art Institute published figure (via pubhist.com/w11061 and Wikidata Q104774114 54.5 claim; clarkart.edu blocks fetches)",
+   "confidence": "high"
+  },
+  {
+   "slug": "sargent-green-door-salute",
+   "height_cm": 53,
+   "width_cm": 35.9,
+   "source": "Met API object 12107, measurements[Overall] — watercolor sheet size (mat 71.1 x 55.9 excluded)",
+   "confidence": "high"
+  },
+  {
+   "slug": "monet-palazzo-da-mula",
+   "height_cm": 61.4,
+   "width_cm": 80.5,
+   "source": "Wikidata Q20191180 via Commons P6243 (NGA 46657)",
+   "confidence": "high"
+  },
+  {
+   "slug": "monet-grand-canal-venice-sf",
+   "height_cm": 73.7,
+   "width_cm": 92.4,
+   "source": "Wikidata Q20198657 via Commons P6243 (matches FAMSF)",
+   "confidence": "high"
+  },
+  {
+   "slug": "monet-san-giorgio-dusk",
+   "height_cm": 65.2,
+   "width_cm": 92.4,
+   "source": "Wikidata Q3947218 (found via wbsearchentities; collection P195 = National Museum Cardiff Q2046319); Commons file had no P6243 link",
+   "confidence": "high"
+  }
+ ],
+ "notes": "All 61 works resolved; none left at 0x0. All values are height x width of the painted/printed surface in cm, rounded to one decimal. Methodology: Met and AIC works from their public APIs (Met elementMeasurements in cm, preferring Overall/Painting/Sheet; AIC dimensions text); Commons works resolved File -> structured-data P6243 (digital representation of) -> Wikidata P2048/P2049, taking preferred-rank claims and converting units. Raw per-work JSON with API titles and dimension strings: /private/tmp/claude-501/-Users-staticzero-Developer-morning-masterpieces/e7bfb60c-0dd1-4ac2-9650-e25caa47bf45/scratchpad/dims-results.json (script dims.mjs alongside). Special cases: (1) Bosch — reported as full OPEN triptych; Wikidata Q321303 carries both the Prado's current official 205.5 x 384.9 (preferred rank, used here) and the older 220 x 390 that matches the task spec's ~220 x 389; pick either, the aspect ratio differs by <1%. (2) Michelangelo Creation of Adam and Raphael School of Athens are frescoes with no canonical panel measurement — task-spec approximations, low confidence. (3) Hokusai (25.7 x 37.9, horizontal oban) and Hiroshige (34 x 24.1, vertical oban) use the Met's single Overall print measurement; Sargent Green Door uses the watercolor sheet (53 x 35.9), not the mat. (4) Turner venice-salute-porch is a commons seed but the underlying object is Met 437853, so the Met API was used. (5) Manet Blue Venice (Shelburne) is the only medium-confidence entry: Wikidata and the Wikipedia Manet catalogue agree on 54 x 65 but the museum's own page could not be checked. Minor sub-cm variances exist between Wikidata and museum pages for a few works (Gleaners 83 vs 83.5 height, Whistler's Mother 163 vs 162.4 width, Young Hare 25 vs 25.1) — immaterial for aspect-ratio purposes. Sanity checks pass: Vermeers ~45 cm, Leutze largest at 378.5 x 647.7, portrait-orientation works (Madame X, Cassatt, Hiroshige, Munch, Friedrich, El Greco) have height > width as expected."
+}

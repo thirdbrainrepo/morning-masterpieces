@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>The Night Gallery — Morning Masterpieces</title>
+  <meta name="description" content="An immersive WebXR gallery: today's masterpiece and the current exhibition, hung at true physical scale.">
+  <meta name="theme-color" content="#030303">
+  <link rel="icon" href="../icons/icon-192.png">
+  <!-- Standalone page: deliberately does NOT use ../styles.css. -->
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* Standalone pages don't get styles.css's global fix — restore hidden's
+       authority over authored display values (see CLAUDE.md gotcha). */
+    [hidden] { display: none !important; }
+    html, body { height: 100%; overflow: hidden; background: #030303; }
+    #stage, #stage canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+    #hud {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: flex-end; pointer-events: none;
+      padding: 0 1.2rem calc(env(safe-area-inset-bottom) + 2rem);
+      font-family: 'Palatino', 'Georgia', serif; color: #e8e3d8; text-align: center;
+    }
+    #hud.insession { display: none; }
+    .plate {
+      pointer-events: auto; max-width: 34rem;
+      background: rgba(18, 16, 13, 0.82); border: 1px solid #2e2a24; border-radius: 12px;
+      padding: 1rem 1.3rem 1.2rem;
+      -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    }
+    .eyebrow {
+      font-family: -apple-system, system-ui, sans-serif; font-size: 0.68rem; font-weight: 600;
+      letter-spacing: 0.18em; text-transform: uppercase; color: #6e675b;
+    }
+    h1 { font-size: 1.3rem; font-weight: 500; font-style: italic; color: #c8a96e; margin: 0.25rem 0 0.4rem; }
+    #hint { font-size: 0.92rem; color: #a49c8c; line-height: 1.5; }
+    #enter {
+      margin-top: 0.9rem; font-family: -apple-system, system-ui, sans-serif;
+      font-size: 1rem; font-weight: 600; color: #1a1408; background: #c8a96e;
+      border: none; border-radius: 999px; padding: 0.8rem 1.8rem; cursor: pointer;
+    }
+    #loading {
+      position: fixed; inset: 0; display: grid; place-items: center;
+      color: #6e675b; font-family: 'Palatino', Georgia, serif; font-style: italic;
+      background: #030303; z-index: 5;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage"></div>
+  <p id="loading">Hanging tonight’s gallery…</p>
+  <div id="hud">
+    <div class="plate">
+      <p class="eyebrow">Morning Masterpieces</p>
+      <h1>The Night Gallery</h1>
+      <p id="hint">Today’s painting and the current exhibition, hung at their
+      true physical size in a dark room. Look at a painting and pinch to walk
+      to it; pinch the amber orb beneath a work and the docent speaks from
+      beside the canvas.</p>
+      <button id="enter" type="button" hidden>Enter the Night Gallery</button>
+    </div>
+  </div>
+  <script type="module" src="gallery.js"></script>
+</body>
+</html>
