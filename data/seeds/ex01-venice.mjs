@@ -10,7 +10,7 @@ export const ex01Venice = [
     id: 438100,
     expect: 'grand canal',
     // The Met photo includes easel clamps and a color-calibration strip.
-    crop: [0.02, 0.05, 0.98, 0.955],
+    crop: [0.022, 0.05, 0.971, 0.955],
     title: 'The Grand Canal, Venice, Looking South toward the Rialto Bridge',
     artist: 'Canaletto',
     artistDates: '1697–1768',

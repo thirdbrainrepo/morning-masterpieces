@@ -50,6 +50,7 @@ const floor = new THREE.Mesh(
   new THREE.CircleGeometry(11, 72).rotateX(-Math.PI / 2),
   new THREE.MeshStandardMaterial({ color: 0x0a0908, roughness: 0.5, metalness: 0.2 })
 );
+floor.userData = { kind: 'floor' };
 scene.add(floor);
 
 // ---------- small shared resources ----------
@@ -67,8 +68,15 @@ function gradientTex(stops, w = 1, h = 256) { // vertical gradient
 }
 const reflFade = gradientTex([[0, 'rgba(255,255,255,0.55)'], [0.55, 'rgba(255,255,255,0.12)'], [1, 'rgba(255,255,255,0)']]);
 
-function fit(g, text, max) {
-  while (g.measureText(text).width > max && text.length > 4) text = text.slice(0, -2).trimEnd() + '…';
+// shrink type to fit before resorting to truncation
+function fitFont(g, text, maxW, startPx, minPx, style) {
+  for (let px = startPx; px >= minPx; px -= 2) {
+    g.font = style.replace('%d', px);
+    if (g.measureText(text).width <= maxW) return text;
+  }
+  while (g.measureText(text).width > maxW && text.length > 4) {
+    text = text.slice(0, -2).trimEnd() + '…';
+  }
   return text;
 }
 function makeCaptionTexture(item) {
@@ -77,10 +85,61 @@ function makeCaptionTexture(item) {
   const g = c.getContext('2d');
   g.fillStyle = '#15120e'; g.fillRect(0, 0, 1024, 256);
   g.strokeStyle = '#2e2a24'; g.lineWidth = 3; g.strokeRect(2, 2, 1020, 252);
-  g.fillStyle = '#e6e2d6'; g.font = 'italic 58px Georgia, serif';
-  g.fillText(fit(g, item.title, 940), 42, 108);
-  g.fillStyle = '#9e9a90'; g.font = '40px Georgia, serif';
-  g.fillText(fit(g, `${item.artist}  ·  ${item.year}`, 940), 42, 186);
+  g.fillStyle = '#e6e2d6';
+  g.fillText(fitFont(g, item.title, 930, 58, 36, 'italic %dpx Georgia, serif'), 42, 108);
+  g.fillStyle = '#9e9a90';
+  g.fillText(fitFont(g, `${item.artist}  ·  ${item.year}`, 930, 40, 28, '%dpx Georgia, serif'), 42, 186);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = maxAniso;
+  return t;
+}
+
+function wrapText(g, text, maxW) {
+  const words = text.split(/\s+/);
+  const lines = [];
+  let line = '';
+  for (const wd of words) {
+    const probe = line ? line + ' ' + wd : wd;
+    if (g.measureText(probe).width > maxW && line) { lines.push(line); line = wd; }
+    else line = probe;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+// the reading panel: pinch a placard, get the docent's text beside the work
+function makeReaderTexture(item) {
+  const W = 1024, H = 1536;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(18,16,13,0.96)'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#2e2a24'; g.lineWidth = 4; g.strokeRect(3, 3, W - 6, H - 6);
+  let y = 96;
+  g.fillStyle = '#c8a96e';
+  g.fillText(fitFont(g, item.title, 900, 52, 34, 'italic %dpx Georgia, serif'), 56, y);
+  y += 54;
+  g.fillStyle = '#9e9a90';
+  g.fillText(fitFont(g, `${item.artist} (${item.artistDates ?? ''})  ·  ${item.year}`, 900, 34, 24, '%dpx Georgia, serif'), 56, y);
+  y += 40;
+  g.fillText(fitFont(g, `${item.medium}  ·  ${item.museum}`, 900, 28, 20, '%dpx Georgia, serif'), 56, y);
+  y += 52;
+  g.strokeStyle = '#2e2a24'; g.beginPath(); g.moveTo(56, y); g.lineTo(W - 56, y); g.stroke();
+  y += 56;
+  g.fillStyle = '#ddd8cc'; g.font = '31px Georgia, serif';
+  for (const line of wrapText(g, item.lesson, W - 120)) {
+    g.fillText(line, 56, y); y += 42;
+    if (y > H - 220) break;
+  }
+  y += 26;
+  g.fillStyle = '#c8a96e'; g.font = '600 22px -apple-system, system-ui, sans-serif';
+  g.fillText('L O O K   C L O S E R', 56, y);
+  y += 40;
+  g.fillStyle = '#b7b0a2'; g.font = 'italic 29px Georgia, serif';
+  for (const line of wrapText(g, item.lookFor, W - 120)) {
+    g.fillText(line, 56, y); y += 40;
+    if (y > H - 40) break;
+  }
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = maxAniso;
@@ -208,11 +267,25 @@ const hairMat = new THREE.LineBasicMaterial({ color: 0x5c5548, transparent: true
 
 async function hang(item, angleDeg, radius, dims) {
   const [wcm, hcm] = dims[item.slug] ?? [100, 80];
-  const w = Math.max(wcm * CM, 0.22), h = Math.max(hcm * CM, 0.22);
+  let w = Math.max(wcm * CM, 0.22), h = Math.max(hcm * CM, 0.22);
   const group = new THREE.Group();
   const a = THREE.MathUtils.degToRad(angleDeg);
   group.position.set(Math.sin(a) * radius, 0, -Math.cos(a) * radius);
   group.lookAt(0, 0, 0);
+
+  // Color fidelity is sacred: the canvas renders its texture EXACTLY —
+  // no scene lights, no tone mapping (ShaderMaterial bypasses it), only a
+  // mean-neutral ±7% brushwork micro-shade from the luminance normal map.
+  // The spotlight pools on frame and panel; the art shows its own truth.
+  const display = await loadTex(`../${item.image}`);
+
+  // Physical measurements set the SCALE; the scan sets the ASPECT. The two
+  // disagree by a few percent (measurement vs crop bounds), and stretching
+  // the texture to the recorded aspect reads as a misaligned frame.
+  if (display.image?.width) {
+    const imgA = display.image.width / display.image.height;
+    if (w / h > imgA) w = h * imgA; else h = w / imgA;
+  }
 
   const cy = 1.5;
   const panelW = Math.max(w + 1.3, 2.1), panelH = 3.4;
@@ -229,12 +302,6 @@ async function hang(item, angleDeg, radius, dims) {
   ]), frameMat);
   frame.position.set(0, cy, -0.02);
   group.add(frame);
-
-  // Color fidelity is sacred: the canvas renders its texture EXACTLY —
-  // no scene lights, no tone mapping (ShaderMaterial bypasses it), only a
-  // mean-neutral ±7% brushwork micro-shade from the luminance normal map.
-  // The spotlight pools on frame and panel; the art shows its own truth.
-  const display = await loadTex(`../${item.image}`);
   const canvasMat = new THREE.ShaderMaterial({
     uniforms: {
       uMap: { value: display },
@@ -298,6 +365,7 @@ async function hang(item, angleDeg, radius, dims) {
     new THREE.MeshBasicMaterial({ map: makeCaptionTexture(item), transparent: true, opacity: 0.92 })
   );
   cap.position.set(Math.max(w / 2 - 0.31, 0), cy - h / 2 - 0.22, 0.001);
+  cap.userData = { kind: 'placard', item, index: state.hangs.length };
   group.add(cap);
 
   const orb = new THREE.Mesh(
@@ -354,8 +422,8 @@ async function hang(item, angleDeg, radius, dims) {
   scene.add(group);
   group.updateWorldMatrix(true, true);
   state.hangs.push({
-    group, painting, orb, orbHit, pad, spot, beamMat, item, stand, intimate,
-    near: false, baseIntensity: 26, hot: 0,
+    group, painting, orb, orbHit, pad, cap, spot, beamMat, item, stand, intimate,
+    near: false, baseIntensity: 26, hot: 0, docentState: 'idle',
     worldPos: new THREE.Vector3().setFromMatrixPosition(painting.matrixWorld),
   });
 }
@@ -613,8 +681,30 @@ camera.add(fade);
 
 function teleportTo(i, near = false) {
   if (state.tp) return;
+  closeReader();
   state.tp = { i, near, t0: clock.elapsedTime, done: false };
 }
+function teleportToPoint(point) {
+  if (state.tp) return;
+  closeReader();
+  state.tp = { point, t0: clock.elapsedTime, done: false };
+}
+
+/* Land the BODY at the target (not the rig origin — the user may have
+   physically wandered) and face the painting with the HEAD's current yaw
+   compensated: spin-then-pinch must still arrive facing the art. */
+function placeRig(target, faceWorldPos) {
+  const headFwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+  const headYaw = Math.atan2(-headFwd.x, -headFwd.z);
+  if (faceWorldPos) {
+    const desired = Math.atan2(-(faceWorldPos.x - target.x), -(faceWorldPos.z - target.z));
+    rig.rotation.y = desired - headYaw;
+  }
+  const off = new THREE.Vector3(camera.position.x, 0, camera.position.z)
+    .applyAxisAngle(new THREE.Vector3(0, 1, 0), rig.rotation.y);
+  rig.position.set(target.x - off.x, 0, target.z - off.z);
+}
+
 function tickTeleport() {
   const tp = state.tp;
   if (!tp) return;
@@ -622,20 +712,24 @@ function tickTeleport() {
   fade.material.opacity = k < 0.5 ? k * 2 : (1 - k) * 2;
   if (k >= 0.5 && !tp.done) {
     tp.done = true;
-    const h = state.hangs[tp.i];
-    h.near = tp.near;
-    h.group.updateWorldMatrix(true, true);
-    const target = new THREE.Vector3(0, 0, tp.near ? h.intimate : h.stand).applyMatrix4(h.group.matrixWorld);
-    rig.position.set(target.x, 0, target.z);
-    const pw = new THREE.Vector3().setFromMatrixPosition(h.painting.matrixWorld);
-    rig.rotation.y = Math.atan2(-(pw.x - target.x), -(pw.z - target.z));
-    if (!renderer.xr.isPresenting) {
-      yaw = 0; pitch = 0;
-      camera.rotation.set(0, 0, 0);
-      camera.position.set(0, 1.6, 0.01);
+    if (tp.point) { // free floor teleport: keep current facing
+      placeRig(tp.point, null);
+      state.focus = -1;
+    } else {
+      const h = state.hangs[tp.i];
+      h.near = tp.near;
+      h.group.updateWorldMatrix(true, true);
+      const target = new THREE.Vector3(0, 0, tp.near ? h.intimate : h.stand).applyMatrix4(h.group.matrixWorld);
+      const pw = new THREE.Vector3().setFromMatrixPosition(h.painting.matrixWorld);
+      if (!renderer.xr.isPresenting) { // 2D: reset drag-look first
+        yaw = 0; pitch = 0;
+        camera.rotation.set(0, 0, 0);
+        camera.position.set(0, 1.6, 0.01);
+      }
+      placeRig(target, pw);
+      state.focus = tp.i;
+      upgradeFocusTexture(tp.i);
     }
-    state.focus = tp.i;
-    upgradeFocusTexture(tp.i);
   }
   if (k >= 1) { state.tp = null; fade.material.opacity = 0; }
 }
@@ -651,20 +745,61 @@ async function upgradeFocusTexture(i) {
 }
 
 // ---------- docent ----------
+// in-scene toast for surfacing failures inside the headset
+let toast = null, toastAt = -1;
+function showToast(msg) {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = 'rgba(20,17,13,0.92)'; g.fillRect(0, 0, 1024, 128);
+  g.strokeStyle = '#5c5548'; g.strokeRect(2, 2, 1020, 124);
+  g.fillStyle = '#e6e2d6'; g.font = '34px -apple-system, system-ui, sans-serif';
+  g.textAlign = 'center';
+  g.fillText(msg.slice(0, 60), 512, 78);
+  if (!toast) {
+    toast = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.9, 0.1125),
+      new THREE.MeshBasicMaterial({ transparent: true, depthTest: false })
+    );
+    toast.renderOrder = 998;
+    camera.add(toast);
+    toast.position.set(0, -0.28, -0.9);
+  }
+  toast.material.map?.dispose();
+  toast.material.map = new THREE.CanvasTexture(c);
+  toast.material.needsUpdate = true;
+  toast.visible = true;
+  toastAt = clock.elapsedTime;
+}
+function tickToast() {
+  if (toast?.visible && clock.elapsedTime - toastAt > 4) toast.visible = false;
+}
+
 async function toggleDocent(i) {
   const h = state.hangs[i];
-  if (listener.context.state === 'suspended') await listener.context.resume().catch(() => {});
+  try {
+    if (listener.context.state !== 'running') await listener.context.resume();
+  } catch { /* keep going; play() may still succeed */ }
   if (state.docent.index === i && state.docent.audio?.isPlaying) {
     state.docent.audio.stop();
     state.docent = { index: -1, audio: null };
+    h.docentState = 'idle';
     return;
   }
-  if (state.docent.audio?.isPlaying) state.docent.audio.stop();
+  if (state.docent.audio?.isPlaying) {
+    state.docent.audio.stop();
+    state.hangs[state.docent.index].docentState = 'idle';
+  }
   if (!h.buffer) {
+    h.docentState = 'loading';
     try {
       const res = await fetch(`../${h.item.audio}`);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
       h.buffer = await listener.context.decodeAudioData(await res.arrayBuffer());
-    } catch { return; }
+    } catch (err) {
+      h.docentState = 'idle';
+      showToast('The docent lost her voice: ' + (err.message ?? 'audio failed'));
+      return;
+    }
   }
   if (!h.pa) {
     h.pa = new THREE.PositionalAudio(listener);
@@ -673,21 +808,61 @@ async function toggleDocent(i) {
     h.pa.panner.panningModel = 'HRTF';
     h.painting.add(h.pa);
   }
-  h.pa.setBuffer(h.buffer);
-  h.pa.play();
-  state.docent = { index: i, audio: h.pa };
+  try {
+    h.pa.setBuffer(h.buffer);
+    h.pa.play();
+    h.pa.source.onended = () => { if (state.docent.index === i) { state.docent = { index: -1, audio: null }; h.docentState = 'idle'; } };
+    state.docent = { index: i, audio: h.pa };
+    h.docentState = 'playing';
+  } catch (err) {
+    h.docentState = 'idle';
+    showToast('The docent lost her voice: ' + (err.message ?? 'playback failed'));
+  }
 }
 
 // ---------- interaction ----------
 function interactables() {
-  const out = [];
-  for (const h of state.hangs) out.push(h.painting, h.orbHit, h.pad);
+  const out = [floor];
+  if (state.reader?.mesh.visible) out.push(state.reader.mesh);
+  for (const h of state.hangs) out.push(h.painting, h.orbHit, h.pad, h.cap);
   return out;
 }
+
+// visible confirmation that a pinch LANDED — small amber ring blooming at
+// the hit point (also our remote diagnostic: flash but no sound = audio;
+// no flash = targeting).
+const pingMesh = new THREE.Mesh(
+  new THREE.RingGeometry(0.5, 0.62, 40),
+  new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false })
+);
+scene.add(pingMesh);
+function ping(point, normal) {
+  pingMesh.position.copy(point).addScaledVector(normal ?? new THREE.Vector3(0, 1, 0), 0.01);
+  pingMesh.lookAt(point.clone().add(normal ?? new THREE.Vector3(0, 1, 0)));
+  state.ping = clock.elapsedTime;
+}
+function tickPing() {
+  if (state.ping == null) return;
+  const k = (clock.elapsedTime - state.ping) / 0.5;
+  if (k >= 1) { pingMesh.material.opacity = 0; state.ping = null; return; }
+  pingMesh.material.opacity = 0.5 * (1 - k);
+  pingMesh.scale.setScalar(0.12 + k * 0.25);
+}
+
 function activate(hit) {
   const u = hit.object.userData;
+  ping(hit.point, hit.face?.normal
+    ? hit.face.normal.clone().transformDirection(hit.object.matrixWorld)
+    : undefined);
   if (u.kind === 'orb') toggleDocent(u.index);
-  else if (u.kind === 'painting') {
+  else if (u.kind === 'placard') toggleReader(u.index);
+  else if (u.kind === 'reader') closeReader();
+  else if (u.kind === 'floor') {
+    const p = hit.point.clone();
+    const r = Math.hypot(p.x, p.z);
+    if (r > 9.5) p.multiplyScalar(9.5 / r);
+    teleportToPoint(p);
+  } else if (u.kind === 'painting') {
     // pinching the work you're with steps in to arm's reach; again steps out
     const h = state.hangs[u.index];
     if (state.focus === u.index) teleportTo(u.index, !h.near);
@@ -695,22 +870,77 @@ function activate(hit) {
   } else if (u.kind === 'pad') teleportTo(u.index, false);
 }
 
+// ---------- reading panel ----------
+function toggleReader(i) {
+  if (state.reader?.index === i && state.reader.mesh.visible) { closeReader(); return; }
+  if (!state.reader) {
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.95, 1.425),
+      new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.97 })
+    );
+    mesh.userData = { kind: 'reader' };
+    state.reader = { mesh, index: -1 };
+    scene.add(mesh);
+  }
+  const h = state.hangs[i];
+  const r = state.reader;
+  r.index = i;
+  r.mesh.material.map?.dispose();
+  r.mesh.material.map = makeReaderTexture(h.item);
+  r.mesh.material.needsUpdate = true;
+  // beside the painting, angled toward the viewing stand
+  const [wcm] = [h.painting.geometry.parameters.width];
+  const local = new THREE.Vector3(wcm / 2 + 0.62, 1.42, 0.42);
+  r.mesh.position.copy(local.applyMatrix4(h.group.matrixWorld));
+  const standWorld = new THREE.Vector3(0, 1.42, h.stand).applyMatrix4(h.group.matrixWorld);
+  r.mesh.lookAt(standWorld);
+  r.mesh.visible = true;
+}
+function closeReader() {
+  if (state.reader) state.reader.mesh.visible = false;
+}
+
 /* Activation happens on selectstart, NOT select: the transient-pointer
    ray equals the user's gaze only on its first frame — after pinch-down
    it follows the HAND, so by 'select' (release) it has drifted and small
    targets like the docent orb miss. Pinch-down carries the true gaze. */
 const tmpMat = new THREE.Matrix4();
-function onSessionSelectStart(ev) {
-  const src = ev.inputSource;
-  if (src.targetRayMode !== 'transient-pointer' && src.targetRayMode !== 'tracked-pointer') return;
-  const pose = ev.frame.getPose(src.targetRaySpace, renderer.xr.getReferenceSpace());
-  if (!pose) return;
+function rayFromPose(pose) {
   tmpMat.fromArray(pose.transform.matrix);
   const origin = new THREE.Vector3().setFromMatrixPosition(tmpMat).applyMatrix4(rig.matrixWorld);
   const dir = new THREE.Vector3(0, 0, -1).transformDirection(tmpMat).transformDirection(rig.matrixWorld);
   state.raycaster.set(origin, dir);
   const hits = state.raycaster.intersectObjects(interactables(), false);
-  if (hits.length) activate(hits[0]);
+  if (hits.length) { activate(hits[0]); return true; }
+  return false;
+}
+function onSessionSelectStart(ev) {
+  const src = ev.inputSource;
+  if (src.targetRayMode !== 'transient-pointer' && src.targetRayMode !== 'tracked-pointer') return;
+  const pose = ev.frame.getPose(src.targetRaySpace, renderer.xr.getReferenceSpace());
+  if (pose && rayFromPose(pose)) { state.lastActivate = clock.elapsedTime; return; }
+  // pose can be unavailable in the event's own frame — retry next XR frame
+  state.pendingSelect = { src, tries: 3 };
+}
+function onSessionSelect(ev) {
+  // belt-and-braces: if pinch-down resolved nothing (null poses), try at
+  // release too — debounced so a successful selectstart doesn't double-fire
+  if (clock.elapsedTime - (state.lastActivate ?? -9) < 0.4) return;
+  const src = ev.inputSource;
+  if (src.targetRayMode !== 'transient-pointer' && src.targetRayMode !== 'tracked-pointer') return;
+  const pose = ev.frame.getPose(src.targetRaySpace, renderer.xr.getReferenceSpace());
+  if (pose && rayFromPose(pose)) state.lastActivate = clock.elapsedTime;
+}
+function tickPendingSelect() {
+  const p = state.pendingSelect;
+  if (!p || !renderer.xr.isPresenting) return;
+  const frame = renderer.xr.getFrame?.();
+  if (!frame) return;
+  const pose = frame.getPose(p.src.targetRaySpace, renderer.xr.getReferenceSpace());
+  if (pose) {
+    if (rayFromPose(pose)) state.lastActivate = clock.elapsedTime;
+    state.pendingSelect = null;
+  } else if (--p.tries <= 0) state.pendingSelect = null;
 }
 
 // 2D fallback: click + WASD + drag-look
@@ -762,7 +992,9 @@ function hover(dt) {
     // museums dim the room around the work you're with
     const focusDim = state.focus >= 0 && state.focus !== i ? 0.72 : 1;
     h.spot.intensity = h.baseIntensity * (1 + h.hot * 0.35) * focusDim;
-    h.orb.material.emissiveIntensity = 0.7 + h.hot * 0.9 + (state.docent.index === i ? 0.8 : 0);
+    const pulse = h.docentState === 'loading' ? 0.9 + Math.sin(clock.elapsedTime * 9) * 0.7
+      : h.docentState === 'playing' ? 0.9 + Math.sin(clock.elapsedTime * 2.4) * 0.35 : 0;
+    h.orb.material.emissiveIntensity = 0.7 + h.hot * 0.9 + pulse;
     // dissolve the beam as the viewer nears its painting — never let the
     // cone slice across a close-up view (gone by 1.8m, full past 3.2m)
     const d = camWorld.distanceTo(h.worldPos);
@@ -813,6 +1045,7 @@ async function boot() {
       try {
         const session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
         session.addEventListener('selectstart', onSessionSelectStart);
+        session.addEventListener('select', onSessionSelect);
         session.addEventListener('end', () => {
           document.getElementById('hud').classList.remove('insession');
           if (state.docent.audio?.isPlaying) state.docent.audio.stop();
@@ -855,6 +1088,9 @@ renderer.setAnimationLoop(() => {
     }
   }
   tickTeleport();
+  tickPendingSelect();
+  tickPing();
+  tickToast();
   hover(dt);
   if (state.motes) state.motes.material.uniforms.uTime.value = t;
   if (state.heart) {
@@ -886,4 +1122,4 @@ boot().catch((err) => {
 });
 
 // debug handle (harmless in production; used by the build's own tests)
-window.NG = { state, teleportTo, toggleDocent, tickTeleport, hover, clock, camera, rig, scene, renderer, startDrone, stopDrone };
+window.NG = { state, teleportTo, teleportToPoint, toggleDocent, toggleReader, activate, tickTeleport, hover, clock, camera, rig, scene, renderer, startDrone, stopDrone };
