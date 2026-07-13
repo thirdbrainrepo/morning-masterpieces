@@ -338,7 +338,11 @@ async function hang(item, angleDeg, radius, dims) {
   beam.position.copy(fixture).addScaledVector(beamDir.normalize(), beamLen / 2);
   group.add(beam);
 
-  const stand = Math.max(1.45, Math.max(w, h) * 1.15);
+  // Two authored distances: a step closer than v2 for viewing, and an
+  // arm's-reach intimate stop — virtual travel spares the user's physical
+  // walking budget before visionOS's ~1.5m safety boundary breaks through.
+  const stand = Math.max(1.1, Math.max(w, h) * 1.0);
+  const intimate = Math.max(0.52, Math.max(w, h) * 0.42);
   const pad = new THREE.Mesh(
     new THREE.RingGeometry(0.16, 0.2, 40).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: ACCENT, transparent: true, opacity: 0.14 })
@@ -350,8 +354,8 @@ async function hang(item, angleDeg, radius, dims) {
   scene.add(group);
   group.updateWorldMatrix(true, true);
   state.hangs.push({
-    group, painting, orb, orbHit, pad, spot, beamMat, item, stand,
-    baseIntensity: 26, hot: 0,
+    group, painting, orb, orbHit, pad, spot, beamMat, item, stand, intimate,
+    near: false, baseIntensity: 26, hot: 0,
     worldPos: new THREE.Vector3().setFromMatrixPosition(painting.matrixWorld),
   });
 }
@@ -607,9 +611,9 @@ const fade = new THREE.Mesh(
 fade.renderOrder = 999;
 camera.add(fade);
 
-function teleportTo(i) {
+function teleportTo(i, near = false) {
   if (state.tp) return;
-  state.tp = { i, t0: clock.elapsedTime, done: false };
+  state.tp = { i, near, t0: clock.elapsedTime, done: false };
 }
 function tickTeleport() {
   const tp = state.tp;
@@ -619,8 +623,9 @@ function tickTeleport() {
   if (k >= 0.5 && !tp.done) {
     tp.done = true;
     const h = state.hangs[tp.i];
+    h.near = tp.near;
     h.group.updateWorldMatrix(true, true);
-    const target = new THREE.Vector3(0, 0, h.stand).applyMatrix4(h.group.matrixWorld);
+    const target = new THREE.Vector3(0, 0, tp.near ? h.intimate : h.stand).applyMatrix4(h.group.matrixWorld);
     rig.position.set(target.x, 0, target.z);
     const pw = new THREE.Vector3().setFromMatrixPosition(h.painting.matrixWorld);
     rig.rotation.y = Math.atan2(-(pw.x - target.x), -(pw.z - target.z));
@@ -682,7 +687,12 @@ function interactables() {
 function activate(hit) {
   const u = hit.object.userData;
   if (u.kind === 'orb') toggleDocent(u.index);
-  else if (u.kind === 'painting' || u.kind === 'pad') teleportTo(u.index);
+  else if (u.kind === 'painting') {
+    // pinching the work you're with steps in to arm's reach; again steps out
+    const h = state.hangs[u.index];
+    if (state.focus === u.index) teleportTo(u.index, !h.near);
+    else teleportTo(u.index, false);
+  } else if (u.kind === 'pad') teleportTo(u.index, false);
 }
 
 /* Activation happens on selectstart, NOT select: the transient-pointer
