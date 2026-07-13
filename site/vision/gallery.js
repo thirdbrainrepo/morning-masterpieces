@@ -48,7 +48,7 @@ scene.add(new THREE.HemisphereLight(0x28231b, 0x080706, 0.5));
 // floor itself stays opaque and cheap.
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(11, 72).rotateX(-Math.PI / 2),
-  new THREE.MeshStandardMaterial({ color: 0x0a0908, roughness: 0.5, metalness: 0.2 })
+  new THREE.MeshStandardMaterial({ color: 0x0a0908, roughness: 0.5, metalness: 0.2, dithering: true })
 );
 floor.userData = { kind: 'floor' };
 scene.add(floor);
@@ -81,14 +81,32 @@ function fitFont(g, text, maxW, startPx, minPx, style) {
 }
 function makeCaptionTexture(item) {
   const c = document.createElement('canvas');
-  c.width = 1024; c.height = 256;
+  c.width = 1024; c.height = 300;
   const g = c.getContext('2d');
-  g.fillStyle = '#15120e'; g.fillRect(0, 0, 1024, 256);
-  g.strokeStyle = '#2e2a24'; g.lineWidth = 3; g.strokeRect(2, 2, 1020, 252);
+  g.fillStyle = '#15120e'; g.fillRect(0, 0, 1024, 300);
+  g.strokeStyle = '#2e2a24'; g.lineWidth = 3; g.strokeRect(2, 2, 1020, 296);
+  // title: up to two wrapped lines before any truncation
   g.fillStyle = '#e6e2d6';
-  g.fillText(fitFont(g, item.title, 930, 58, 36, 'italic %dpx Georgia, serif'), 42, 108);
+  let titleLines = [item.title];
+  for (let px = 52; px >= 34; px -= 2) {
+    g.font = `italic ${px}px Georgia, serif`;
+    titleLines = wrapText(g, item.title, 930);
+    if (titleLines.length <= 2) break;
+  }
+  if (titleLines.length > 2) {
+    titleLines = titleLines.slice(0, 2);
+    titleLines[1] = fitFont(g, titleLines[1] + '…', 930, 34, 34, 'italic %dpx Georgia, serif');
+  }
+  let y = titleLines.length === 2 ? 88 : 112;
+  for (const line of titleLines) { g.fillText(line, 42, y); y += 62; }
   g.fillStyle = '#9e9a90';
-  g.fillText(fitFont(g, `${item.artist}  ·  ${item.year}`, 930, 40, 28, '%dpx Georgia, serif'), 42, 186);
+  g.fillText(fitFont(g, `${item.artist}  ·  ${item.year}`, 780, 38, 26, '%dpx Georgia, serif'), 42, 240);
+  // affordance: this plate opens the lesson
+  g.fillStyle = '#c8a96e';
+  g.font = '600 26px -apple-system, system-ui, sans-serif';
+  g.textAlign = 'right';
+  g.fillText('❯  R E A D', 982, 240);
+  g.textAlign = 'left';
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = maxAniso;
@@ -233,6 +251,13 @@ const BEAM_FRAG = /* glsl */`
   uniform vec3 uColor;
   uniform float uOpacity;
   uniform float uDissolve; // 1 = full beam, 0 = gone
+  // screen-space hash dither: low-alpha gradients over black band at 8
+  // bits exactly like the wallpaper matte did — same cure, in-shader
+  float hash12(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
   void main() {
     vec3 viewDir = normalize(cameraPosition - vWorldPos);
     float facing = abs(dot(viewDir, normalize(vNormalW)));
@@ -240,7 +265,8 @@ const BEAM_FRAG = /* glsl */`
     float head = smoothstep(0.0, 0.18, vAxial);
     float tail = 1.0 - smoothstep(0.55, 1.0, vAxial);
     float a = uOpacity * rim * head * tail * uDissolve;
-    gl_FragColor = vec4(uColor, a);
+    a += (hash12(gl_FragCoord.xy) - 0.5) * 0.0078; // ±1 level of 8-bit
+    gl_FragColor = vec4(uColor, max(a, 0.0));
   }
 `;
 function makeBeamMaterial(height) {
@@ -261,8 +287,9 @@ function makeBeamMaterial(height) {
 }
 
 // ---------- hang one work ----------
-const frameMat = new THREE.MeshStandardMaterial({ color: 0x241c12, roughness: 0.55, metalness: 0.1 });
-const panelMat = new THREE.MeshStandardMaterial({ color: 0x110f0b, roughness: 1.0 });
+// dithering: near-black lit gradients band at 8 bits without it
+const frameMat = new THREE.MeshStandardMaterial({ color: 0x241c12, roughness: 0.55, metalness: 0.1, dithering: true });
+const panelMat = new THREE.MeshStandardMaterial({ color: 0x110f0b, roughness: 1.0, dithering: true });
 const hairMat = new THREE.LineBasicMaterial({ color: 0x5c5548, transparent: true, opacity: 0.55 });
 
 async function hang(item, angleDeg, radius, dims) {
@@ -361,7 +388,7 @@ async function hang(item, angleDeg, radius, dims) {
   group.add(refl);
 
   const cap = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.62, 0.155),
+    new THREE.PlaneGeometry(0.62, 0.182),
     new THREE.MeshBasicMaterial({ map: makeCaptionTexture(item), transparent: true, opacity: 0.92 })
   );
   cap.position.set(Math.max(w / 2 - 0.31, 0), cy - h / 2 - 0.22, 0.001);
@@ -576,14 +603,23 @@ function buildHeart(lessonText) {
     heart.add(ring);
   }
 
-  // soft core
-  const cc = document.createElement('canvas'); cc.width = cc.height = 256;
+  // soft core — noise baked into the gradient (a magnified 8-bit radial
+  // gradient is a banding machine; ±1-level grain breaks the contours,
+  // same trick as the wallpaper matte)
+  const CS = 512;
+  const cc = document.createElement('canvas'); cc.width = cc.height = CS;
   const cg = cc.getContext('2d');
-  const rad = cg.createRadialGradient(128, 128, 0, 128, 128, 128);
+  const rad = cg.createRadialGradient(CS / 2, CS / 2, 0, CS / 2, CS / 2, CS / 2);
   rad.addColorStop(0, 'rgba(255,238,205,0.9)');
   rad.addColorStop(0.25, 'rgba(255,222,170,0.35)');
   rad.addColorStop(1, 'rgba(255,222,170,0)');
-  cg.fillStyle = rad; cg.fillRect(0, 0, 256, 256);
+  cg.fillStyle = rad; cg.fillRect(0, 0, CS, CS);
+  const id = cg.getImageData(0, 0, CS, CS);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 2.2;
+    id.data[i + 3] = Math.max(0, Math.min(255, id.data[i + 3] + n));
+  }
+  cg.putImageData(id, 0, 0);
   const coreTex = new THREE.CanvasTexture(cc);
   const core = new THREE.Sprite(new THREE.SpriteMaterial({
     map: coreTex, transparent: true, opacity: 0.85,
@@ -789,16 +825,18 @@ async function upgradeFocusTexture(i) {
 // in-scene toast for surfacing failures inside the headset
 let toast = null, toastAt = -1;
 function showToast(msg) {
-  const c = document.createElement('canvas'); c.width = 1024; c.height = 128;
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 176;
   const g = c.getContext('2d');
-  g.fillStyle = 'rgba(20,17,13,0.92)'; g.fillRect(0, 0, 1024, 128);
-  g.strokeStyle = '#5c5548'; g.strokeRect(2, 2, 1020, 124);
-  g.fillStyle = '#e6e2d6'; g.font = '34px -apple-system, system-ui, sans-serif';
+  g.fillStyle = 'rgba(20,17,13,0.92)'; g.fillRect(0, 0, 1024, 176);
+  g.strokeStyle = '#5c5548'; g.strokeRect(2, 2, 1020, 172);
+  g.fillStyle = '#e6e2d6'; g.font = '32px -apple-system, system-ui, sans-serif';
   g.textAlign = 'center';
-  g.fillText(msg.slice(0, 60), 512, 78);
+  const lines = wrapText(g, msg.slice(0, 140), 940).slice(0, 3);
+  let ty = lines.length > 1 ? 62 : 98;
+  for (const line of lines) { g.fillText(line, 512, ty); ty += 44; }
   if (!toast) {
     toast = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.9, 0.1125),
+      new THREE.PlaneGeometry(0.9, 0.155),
       new THREE.MeshBasicMaterial({ transparent: true, depthTest: false })
     );
     toast.renderOrder = 998;
@@ -831,13 +869,18 @@ async function toggleDocent(i) {
     state.hangs[state.docent.index].docentState = 'idle';
   }
   const FORCE_ELEMENT = new URLSearchParams(location.search).has('audioel');
-  if (!h.buffer && !h.mediaEl && !FORCE_ELEMENT) {
+  if (!h.buffer && !FORCE_ELEMENT) {
     h.docentState = 'loading';
-    try {
-      const res = await fetch(`../${h.item.audio}`);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      h.buffer = await listener.context.decodeAudioData(await res.arrayBuffer());
-    } catch { /* fall through to the media-element path below */ }
+    // Two decode attempts: cache-friendly, then cache-bypassing — a stale
+    // service-worker copy (e.g. the old 96kHz encodes) self-heals here.
+    for (const init of [undefined, { cache: 'reload' }]) {
+      try {
+        const res = await fetch(`../${h.item.audio}`, init);
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        h.buffer = await listener.context.decodeAudioData(await res.arrayBuffer());
+        break;
+      } catch (err) { h.lastDecodeErr = (err.name ?? '') + ' ' + (err.message ?? ''); }
+    }
   }
   if (!h.pa) {
     h.pa = new THREE.PositionalAudio(listener);
@@ -865,15 +908,23 @@ async function toggleDocent(i) {
     } else {
       // decodeAudioData refused (or forced): let the media stack decode —
       // it accepts anything CoreMedia plays — and feed the same panner.
+      // XR pinches carry no DOM activation, so playback runs through the
+      // ONE element blessed during the Enter click (Safari honors a
+      // previously-activated element's license for programmatic play).
       if (!h.mediaEl) {
         h.docentState = 'loading';
-        h.mediaEl = new Audio(`../${h.item.audio}`);
+        // one blessed element per hang: media-element sources can only be
+        // wired to a panner once, so the pool hands each work its own
+        h.mediaEl = state.blessedPool?.pop() ?? new Audio();
         h.mediaEl.playsInline = true;
         h.mediaEl.preload = 'auto';
         h.pa.setMediaElementSource(h.mediaEl);
-        h.mediaEl.addEventListener('ended', () => {
+        h.mediaEl.onended = () => {
           if (state.docent.index === i) { state.docent = { index: -1, audio: null }; h.docentState = 'idle'; }
-        });
+        };
+      }
+      if (h.mediaEl.src !== new URL(`../${h.item.audio}`, location.href).href) {
+        h.mediaEl.src = `../${h.item.audio}`;
       }
       h.mediaEl.currentTime = 0;
       await h.mediaEl.play();
@@ -885,7 +936,8 @@ async function toggleDocent(i) {
     h.docentState = 'playing';
   } catch (err) {
     h.docentState = 'idle';
-    showToast('The docent lost her voice: ' + (err.message ?? 'playback failed'));
+    const stage = h.buffer ? 'buffer-play' : (h.lastDecodeErr ? `decode(${h.lastDecodeErr.trim()}) then element-play` : 'element-play');
+    showToast(`The docent lost her voice — ${stage}: ${err.name ?? ''} ${err.message ?? ''}`);
   }
 }
 
@@ -1118,6 +1170,18 @@ async function boot() {
     btn.addEventListener('click', async () => {
       const ctx = THREE.AudioContext.getContext();
       if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+      // Bless a pool of media elements while we hold a REAL user activation:
+      // XR pinches carry none, and Safari only honors play() on elements
+      // that were activated before. One per work, for the fallback path.
+      if (!state.blessedPool) {
+        const SILENT = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+        state.blessedPool = Array.from({ length: 14 }, () => {
+          const el = new Audio(SILENT);
+          el.playsInline = true;
+          el.play().then(() => el.pause()).catch(() => {});
+          return el;
+        });
+      }
       try {
         const session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
         session.addEventListener('selectstart', onSessionSelectStart);
