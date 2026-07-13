@@ -230,12 +230,37 @@ async function hang(item, angleDeg, radius, dims) {
   frame.position.set(0, cy, -0.02);
   group.add(frame);
 
+  // Color fidelity is sacred: the canvas renders its texture EXACTLY —
+  // no scene lights, no tone mapping (ShaderMaterial bypasses it), only a
+  // mean-neutral ±7% brushwork micro-shade from the luminance normal map.
+  // The spotlight pools on frame and panel; the art shows its own truth.
   const display = await loadTex(`../${item.image}`);
-  const canvasMat = new THREE.MeshStandardMaterial({
-    map: display, roughness: 0.62, metalness: 0,
-    normalScale: new THREE.Vector2(0.55, 0.55),
+  const canvasMat = new THREE.ShaderMaterial({
+    uniforms: {
+      uMap: { value: display },
+      uRelief: { value: display.image ? makeNormalMap(display.image) : null },
+      uReliefAmt: { value: display.image ? 1.0 : 0.0 },
+    },
+    vertexShader: /* glsl */`
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      uniform sampler2D uMap, uRelief;
+      uniform float uReliefAmt;
+      varying vec2 vUv;
+      void main() {
+        vec3 col = texture2D(uMap, vUv).rgb;
+        vec3 n = texture2D(uRelief, vUv).xyz * 2.0 - 1.0;
+        // fixed raking light from the fixture (up and slightly forward)
+        float shade = 0.965 + 0.07 * (dot(normalize(n), normalize(vec3(0.0, 0.62, 0.78))) - 0.5) * uReliefAmt;
+        gl_FragColor = vec4(col * shade, 1.0);
+      }
+    `,
   });
-  if (display.image) canvasMat.normalMap = makeNormalMap(display.image);
   const painting = new THREE.Mesh(new THREE.PlaneGeometry(w, h), canvasMat);
   painting.position.set(0, cy, 0);
   painting.userData = { kind: 'painting', item, index: state.hangs.length };
@@ -276,12 +301,19 @@ async function hang(item, angleDeg, radius, dims) {
   group.add(cap);
 
   const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.035, 20, 14),
+    new THREE.SphereGeometry(0.042, 20, 14),
     new THREE.MeshStandardMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 0.7, roughness: 0.4 })
   );
   orb.position.set(-Math.max(w / 2 - 0.02, 0.33) - 0.12, cy - h / 2 - 0.22, 0.02);
-  orb.userData = { kind: 'orb', item, index: state.hangs.length };
   group.add(orb);
+  // generous invisible pinch target — a 4cm orb at 2m is sub-gaze-precision
+  const orbHit = new THREE.Mesh(
+    new THREE.SphereGeometry(0.16, 8, 6),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  orbHit.position.copy(orb.position);
+  orbHit.userData = { kind: 'orb', item, index: state.hangs.length };
+  group.add(orbHit);
 
   // the 30-degree museum spot, tight to the canvas
   const spot = new THREE.SpotLight(0xffe0b8, 26, 8, Math.atan2(Math.max(w, h) * 0.60, 2.6), 0.65, 1.6);
@@ -291,16 +323,19 @@ async function hang(item, angleDeg, radius, dims) {
   spot.target = painting;
   group.add(spot);
 
-  // soft beam: apex at the fixture, widening down toward the canvas
+  // soft beam: apex at the fixture, wide enough to clear the canvas
+  // CORNERS, and ending well SHORT of the canvas plane — the beam is
+  // fixture glow only; it must never overlay the art (washes the image).
   const fixture = new THREE.Vector3(0, sy, sz);
   const target = new THREE.Vector3(0, cy, 0);
   const beamDir = target.clone().sub(fixture);
-  const beamLen = beamDir.length() + 0.55;
-  const beamR = Math.max(w, h) * 0.5;
+  const fullDist = beamDir.length();
+  const beamLen = Math.max(0.6, fullDist - 0.5);
+  const beamR = Math.hypot(w, h) * 0.62 * (beamLen / fullDist);
   const beamMat = makeBeamMaterial(beamLen);
   const beam = new THREE.Mesh(new THREE.ConeGeometry(beamR, beamLen, 28, 1, true), beamMat);
   beam.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), beamDir.clone().normalize().negate());
-  beam.position.copy(fixture).addScaledVector(beamDir.normalize(), beamLen / 2 - 0.15);
+  beam.position.copy(fixture).addScaledVector(beamDir.normalize(), beamLen / 2);
   group.add(beam);
 
   const stand = Math.max(1.45, Math.max(w, h) * 1.15);
@@ -315,7 +350,7 @@ async function hang(item, angleDeg, radius, dims) {
   scene.add(group);
   group.updateWorldMatrix(true, true);
   state.hangs.push({
-    group, painting, orb, pad, spot, beamMat, item, stand,
+    group, painting, orb, orbHit, pad, spot, beamMat, item, stand,
     baseIntensity: 26, hot: 0,
     worldPos: new THREE.Vector3().setFromMatrixPosition(painting.matrixWorld),
   });
@@ -606,8 +641,7 @@ async function upgradeFocusTexture(i) {
   h.upgraded = true;
   try {
     const hi = await loadTex(`../${h.item.zoom}`);
-    h.painting.material.map = hi;
-    h.painting.material.needsUpdate = true;
+    h.painting.material.uniforms.uMap.value = hi; // fidelity shader's map
   } catch { /* keep display res */ }
 }
 
@@ -642,7 +676,7 @@ async function toggleDocent(i) {
 // ---------- interaction ----------
 function interactables() {
   const out = [];
-  for (const h of state.hangs) out.push(h.painting, h.orb, h.pad);
+  for (const h of state.hangs) out.push(h.painting, h.orbHit, h.pad);
   return out;
 }
 function activate(hit) {
@@ -651,8 +685,12 @@ function activate(hit) {
   else if (u.kind === 'painting' || u.kind === 'pad') teleportTo(u.index);
 }
 
+/* Activation happens on selectstart, NOT select: the transient-pointer
+   ray equals the user's gaze only on its first frame — after pinch-down
+   it follows the HAND, so by 'select' (release) it has drifted and small
+   targets like the docent orb miss. Pinch-down carries the true gaze. */
 const tmpMat = new THREE.Matrix4();
-function onSessionSelect(ev) {
+function onSessionSelectStart(ev) {
   const src = ev.inputSource;
   if (src.targetRayMode !== 'transient-pointer' && src.targetRayMode !== 'tracked-pointer') return;
   const pose = ev.frame.getPose(src.targetRaySpace, renderer.xr.getReferenceSpace());
@@ -716,9 +754,9 @@ function hover(dt) {
     h.spot.intensity = h.baseIntensity * (1 + h.hot * 0.35) * focusDim;
     h.orb.material.emissiveIntensity = 0.7 + h.hot * 0.9 + (state.docent.index === i ? 0.8 : 0);
     // dissolve the beam as the viewer nears its painting — never let the
-    // cone slice across a close-up view
+    // cone slice across a close-up view (gone by 1.8m, full past 3.2m)
     const d = camWorld.distanceTo(h.worldPos);
-    const dissolve = THREE.MathUtils.clamp((d - 1.3) / 1.4, 0, 1);
+    const dissolve = THREE.MathUtils.clamp((d - 1.8) / 1.4, 0, 1);
     h.beamMat.uniforms.uDissolve.value = dissolve * focusDim;
   }
 }
@@ -764,7 +802,7 @@ async function boot() {
       if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
       try {
         const session = await navigator.xr.requestSession('immersive-vr', { optionalFeatures: ['local-floor'] });
-        session.addEventListener('select', onSessionSelect);
+        session.addEventListener('selectstart', onSessionSelectStart);
         session.addEventListener('end', () => {
           document.getElementById('hud').classList.remove('insession');
           if (state.docent.audio?.isPlaying) state.docent.audio.stop();
@@ -792,6 +830,7 @@ const camRight = new THREE.Vector3(), camUp = new THREE.Vector3();
 renderer.setAnimationLoop(() => {
   const dt = clock.getDelta();
   const t = clock.elapsedTime;
+  healProjection(); // a camera born in a 0x0 viewport heals on first real frame
   if (!renderer.xr.isPresenting) {
     const speed = 2.1 * dt;
     const dir = new THREE.Vector3();
