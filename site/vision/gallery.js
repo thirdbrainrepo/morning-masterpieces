@@ -368,9 +368,50 @@ async function hang(item, angleDeg, radius, dims) {
   cap.userData = { kind: 'placard', item, index: state.hangs.length };
   group.add(cap);
 
+  // the docent's orb: swirling ember, breathing with her voice when she speaks
   const orb = new THREE.Mesh(
-    new THREE.SphereGeometry(0.042, 20, 14),
-    new THREE.MeshStandardMaterial({ color: ACCENT, emissive: ACCENT, emissiveIntensity: 0.7, roughness: 0.4 })
+    new THREE.SphereGeometry(0.042, 24, 18),
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uLevel: { value: 0 },  // live speech amplitude 0..1
+        uState: { value: 0 },  // 0 idle, 1 loading, 2 playing
+        uHot: { value: 0 },    // head-ray hover warmth
+      },
+      vertexShader: /* glsl */`
+        varying vec3 vN, vP, vWorld;
+        void main() {
+          vN = normalize(normalMatrix * normal);
+          vP = position;
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorld = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform float uTime, uLevel, uState, uHot;
+        varying vec3 vN, vP, vWorld;
+        void main() {
+          vec3 amber = vec3(0.784, 0.663, 0.431);
+          vec3 ember = vec3(1.0, 0.83, 0.55);
+          // slow swirl bands wrapping the sphere; speech adds churn
+          float churn = 1.0 + uLevel * 5.0 + uState * 0.5;
+          float ang = atan(vP.z, vP.x);
+          float swirl = 0.5 + 0.5 * sin(ang * 3.0 + vP.y * 55.0 + uTime * (0.6 * churn));
+          float swirl2 = 0.5 + 0.5 * sin(ang * -5.0 + vP.y * 90.0 - uTime * (0.9 * churn));
+          float bands = swirl * 0.6 + swirl2 * 0.4;
+          // fresnel rim
+          vec3 viewDir = normalize(cameraPosition - vWorld);
+          float rim = pow(1.0 - abs(dot(viewDir, normalize(vN))), 1.6);
+          float loadPulse = uState > 0.5 && uState < 1.5 ? 0.5 + 0.5 * sin(uTime * 9.0) : 0.0;
+          float speak = uLevel * 0.55;
+          float glow = 0.32 + bands * 0.28 + rim * 0.5 + loadPulse * 0.45 + speak + uHot * 0.3;
+          glow = min(glow, 1.35); // never clip to white — the swirl must survive speech peaks
+          vec3 col = mix(amber, ember, clamp(bands * 0.45 + speak * 0.8, 0.0, 1.0)) * glow;
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+    })
   );
   orb.position.set(-Math.max(w / 2 - 0.02, 0.33) - 0.12, cy - h / 2 - 0.22, 0.02);
   group.add(orb);
@@ -802,7 +843,18 @@ async function toggleDocent(i) {
     h.pa = new THREE.PositionalAudio(listener);
     h.pa.setRefDistance(1.3);
     h.pa.setRolloffFactor(1.4);
-    h.pa.panner.panningModel = 'HRTF';
+    // 'equalpower' by default: WebKit's HRTF colors mono speech with a
+    // hollow "voice in a jug" comb-filter, and visionOS may add its own
+    // spatial processing on top. Equal-power keeps direction + distance
+    // without the tube. ?hrtf=1 restores HRTF for A/B.
+    h.pa.panner.panningModel = new URLSearchParams(location.search).has('hrtf') ? 'HRTF' : 'equalpower';
+    // gentle presence lift to counter distance/panner dullness on speech
+    const shelf = listener.context.createBiquadFilter();
+    shelf.type = 'highshelf';
+    shelf.frequency.value = 2800;
+    shelf.gain.value = 3.5;
+    h.pa.setFilters([shelf]);
+    h.analyser = new THREE.AudioAnalyser(h.pa, 32);
     h.painting.add(h.pa);
   }
   try {
@@ -1009,9 +1061,16 @@ function hover(dt) {
     // museums dim the room around the work you're with
     const focusDim = state.focus >= 0 && state.focus !== i ? 0.72 : 1;
     h.spot.intensity = h.baseIntensity * (1 + h.hot * 0.35) * focusDim;
-    const pulse = h.docentState === 'loading' ? 0.9 + Math.sin(clock.elapsedTime * 9) * 0.7
-      : h.docentState === 'playing' ? 0.9 + Math.sin(clock.elapsedTime * 2.4) * 0.35 : 0;
-    h.orb.material.emissiveIntensity = 0.7 + h.hot * 0.9 + pulse;
+    const u = h.orb.material.uniforms;
+    u.uTime.value = clock.elapsedTime;
+    u.uHot.value = h.hot;
+    u.uState.value = h.docentState === 'loading' ? 1 : h.docentState === 'playing' ? 2 : 0;
+    const level = h.docentState === 'playing' && h.analyser
+      ? Math.min(1, h.analyser.getAverageFrequency() / 110)
+      : 0;
+    u.uLevel.value += (level - u.uLevel.value) * Math.min(1, dt * 12);
+    const s = 1 + u.uLevel.value * 0.22 + (h.docentState === 'loading' ? Math.sin(clock.elapsedTime * 9) * 0.05 : 0);
+    h.orb.scale.setScalar(s);
     // dissolve the beam as the viewer nears its painting — never let the
     // cone slice across a close-up view (gone by 1.8m, full past 3.2m)
     const d = camWorld.distanceTo(h.worldPos);
