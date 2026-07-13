@@ -10,7 +10,7 @@
 // installed PWAs keep serving the old bytes until the image cache is
 // renamed away by a version bump.
 
-const VERSION = 'mm-v11';
+const VERSION = 'mm-v12';
 const SHELL = ['./', 'index.html', 'shortcuts.html', 'styles.css', 'app.js', 'manifest.webmanifest'];
 const IMAGE_CACHE = `${VERSION}-images`;
 const IMAGE_LIMIT = 220;

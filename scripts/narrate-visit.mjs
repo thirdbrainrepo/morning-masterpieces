@@ -127,7 +127,7 @@ async function main() {
       const list = path.join(tmp, `${stop.id}-list.txt`);
       await writeFile(list, listLines.join('\n') + '\n');
       await run('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', list,
-        '-af', 'loudnorm=I=-16:TP=-1.5', '-c:a', 'aac', '-b:a', '80k', out]);
+        '-af', 'loudnorm=I=-16:TP=-1.5', '-ar', '44100', '-c:a', 'aac', '-b:a', '80k', out]); // -ar pinned: loudnorm upsamples and unpinned output landed at 96kHz, which visionOS decodeAudioData rejects (fleet re-encoded in place 2026-07-12)
       hashes[stop.id] = hash;
       await writeFile(HASHES, JSON.stringify(hashes, null, 1));
       const { stdout } = await run('ffprobe', ['-v', 'quiet', '-show_entries',

@@ -136,7 +136,7 @@ async function narrate(item, tmp, silenceFor) {
   await writeFile(list, listLines.join('\n') + '\n');
   const out = path.join(AUDIO, `${item.slug}.m4a`);
   await run('ffmpeg', ['-y', '-f', 'concat', '-safe', '0', '-i', list,
-    '-af', 'loudnorm=I=-16:TP=-1.5', '-c:a', 'aac', '-b:a', '80k', out]);
+    '-af', 'loudnorm=I=-16:TP=-1.5', '-ar', '44100', '-c:a', 'aac', '-b:a', '80k', out]); // -ar pinned: loudnorm upsamples and unpinned output landed at 96kHz, which visionOS decodeAudioData rejects (fleet re-encoded in place 2026-07-12)
   return { out, chunks: segs.length };
 }
 

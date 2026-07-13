@@ -789,17 +789,14 @@ async function toggleDocent(i) {
     state.docent.audio.stop();
     state.hangs[state.docent.index].docentState = 'idle';
   }
-  if (!h.buffer) {
+  const FORCE_ELEMENT = new URLSearchParams(location.search).has('audioel');
+  if (!h.buffer && !h.mediaEl && !FORCE_ELEMENT) {
     h.docentState = 'loading';
     try {
       const res = await fetch(`../${h.item.audio}`);
       if (!res.ok) throw new Error('HTTP ' + res.status);
       h.buffer = await listener.context.decodeAudioData(await res.arrayBuffer());
-    } catch (err) {
-      h.docentState = 'idle';
-      showToast('The docent lost her voice: ' + (err.message ?? 'audio failed'));
-      return;
-    }
+    } catch { /* fall through to the media-element path below */ }
   }
   if (!h.pa) {
     h.pa = new THREE.PositionalAudio(listener);
@@ -809,9 +806,29 @@ async function toggleDocent(i) {
     h.painting.add(h.pa);
   }
   try {
-    h.pa.setBuffer(h.buffer);
-    h.pa.play();
-    h.pa.source.onended = () => { if (state.docent.index === i) { state.docent = { index: -1, audio: null }; h.docentState = 'idle'; } };
+    if (h.buffer && !FORCE_ELEMENT) {
+      h.pa.setBuffer(h.buffer);
+      h.pa.play();
+      h.pa.source.onended = () => { if (state.docent.index === i) { state.docent = { index: -1, audio: null }; h.docentState = 'idle'; } };
+    } else {
+      // decodeAudioData refused (or forced): let the media stack decode —
+      // it accepts anything CoreMedia plays — and feed the same panner.
+      if (!h.mediaEl) {
+        h.docentState = 'loading';
+        h.mediaEl = new Audio(`../${h.item.audio}`);
+        h.mediaEl.playsInline = true;
+        h.mediaEl.preload = 'auto';
+        h.pa.setMediaElementSource(h.mediaEl);
+        h.mediaEl.addEventListener('ended', () => {
+          if (state.docent.index === i) { state.docent = { index: -1, audio: null }; h.docentState = 'idle'; }
+        });
+      }
+      h.mediaEl.currentTime = 0;
+      await h.mediaEl.play();
+      // adapt the shared stop interface
+      h.pa.isPlaying = true;
+      h.pa.stop = () => { h.mediaEl.pause(); h.pa.isPlaying = false; };
+    }
     state.docent = { index: i, audio: h.pa };
     h.docentState = 'playing';
   } catch (err) {
