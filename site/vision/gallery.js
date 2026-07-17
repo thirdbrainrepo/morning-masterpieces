@@ -288,7 +288,10 @@ function makeBeamMaterial(height) {
 
 // ---------- hang one work ----------
 // dithering: near-black lit gradients band at 8 bits without it
-const frameMat = new THREE.MeshStandardMaterial({ color: 0x241c12, roughness: 0.55, metalness: 0.1, dithering: true });
+const frameMat = new THREE.MeshStandardMaterial({ color: 0x32271a, roughness: 0.42, metalness: 0.22, dithering: true });
+// muted-gold liner between frame and canvas: catches the spot, separates
+// frame from panel without shouting
+const linerMat = new THREE.MeshStandardMaterial({ color: 0x9a7d4e, roughness: 0.32, metalness: 0.65, dithering: true });
 const panelMat = new THREE.MeshStandardMaterial({ color: 0x110f0b, roughness: 1.0, dithering: true });
 const hairMat = new THREE.LineBasicMaterial({ color: 0x5c5548, transparent: true, opacity: 0.55 });
 
@@ -320,15 +323,26 @@ async function hang(item, angleDeg, radius, dims) {
   panel.position.set(0, panelH / 2, -0.06);
   group.add(panel);
 
-  const fw = 0.045, fd = 0.05;
+  const fw = 0.05, fd = 0.075; // deeper profile: throws real edge light
   const frame = new THREE.Mesh(mergeBoxes([
     [w + fw * 2, fw, fd, 0, h / 2 + fw / 2, 0],
     [w + fw * 2, fw, fd, 0, -h / 2 - fw / 2, 0],
     [fw, h, fd, -w / 2 - fw / 2, 0, 0],
     [fw, h, fd, w / 2 + fw / 2, 0, 0],
   ]), frameMat);
-  frame.position.set(0, cy, -0.02);
+  frame.position.set(0, cy, -0.028);
   group.add(frame);
+
+  // thin gold fillet between frame and canvas — the classic gallery liner
+  const lw = 0.011;
+  const liner = new THREE.Mesh(mergeBoxes([
+    [w + lw * 2, lw, 0.02, 0, h / 2 + lw / 2, 0],
+    [w + lw * 2, lw, 0.02, 0, -h / 2 - lw / 2, 0],
+    [lw, h, 0.02, -w / 2 - lw / 2, 0, 0],
+    [lw, h, 0.02, w / 2 + lw / 2, 0, 0],
+  ]), linerMat);
+  liner.position.set(0, cy, 0.006);
+  group.add(liner);
   const canvasMat = new THREE.ShaderMaterial({
     uniforms: {
       uMap: { value: display },
@@ -641,6 +655,108 @@ function buildHeart(lessonText) {
 
   scene.add(heart);
   state.heart = { group: heart, mat, letters };
+}
+
+// ---------- the sky: a real-time, location-accurate planetarium ----------
+// The dome overhead is the actual night sky for this place and moment —
+// the stars that would be there if the daylight were switched off. 8,920
+// stars to mag 6.5 (HYG catalog, baked by scripts/build-stars.mjs) hung
+// on the celestial sphere and wheeled by local sidereal time. North is
+// the gallery's -Z: the centerpiece hangs due north, Polaris above it.
+const OBSERVER = {
+  lat: Number(new URLSearchParams(location.search).get('lat') ?? 37.77),
+  lon: Number(new URLSearchParams(location.search).get('lon') ?? -122.42), // east+
+};
+
+// Greenwich Mean Sidereal Time, hours (Meeus approximation, plenty here)
+function gmstHours(date) {
+  const jd = date.getTime() / 86400000 + 2440587.5;
+  const d = jd - 2451545.0;
+  let g = 18.697374558 + 24.06570982441908 * d;
+  return ((g % 24) + 24) % 24;
+}
+function lstRadians(date) {
+  const lst = gmstHours(date) + OBSERVER.lon / 15;
+  return ((lst % 24) + 24) % 24 * (Math.PI / 12);
+}
+
+async function buildSky() {
+  const s = await fetch('./stars.json').then((r) => r.json());
+  const N = s.count;
+  const pos = new Float32Array(N * 3);
+  const attr = new Float32Array(N * 2); // mag, ci
+  const R = 55;
+  for (let i = 0; i < N; i++) {
+    const ra = s.ra[i] * Math.PI / 180;
+    const dec = s.dec[i] * Math.PI / 180;
+    // equatorial frame, celestial pole = +Y of the spin group; RA spins
+    // about it. x/z chosen so the sign test (Polaris/Vega) passes below.
+    pos[i * 3] = R * Math.cos(dec) * Math.cos(ra);
+    pos[i * 3 + 1] = R * Math.sin(dec);
+    pos[i * 3 + 2] = -R * Math.cos(dec) * Math.sin(ra);
+    attr[i * 2] = s.mag[i];
+    attr[i * 2 + 1] = s.ci[i];
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aStar', new THREE.BufferAttribute(attr, 2));
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uTime: { value: 0 } },
+    vertexShader: /* glsl */`
+      attribute vec2 aStar;
+      uniform float uTime;
+      varying float vA;
+      varying vec3 vTint;
+      void main() {
+        vec4 wp = modelMatrix * vec4(position, 1.0);
+        // horizon fade: stars die gently into the earth's shadow
+        float alt = wp.y / 55.0;
+        float horizon = smoothstep(-0.03, 0.12, alt);
+        float m = aStar.x;
+        float bright = clamp((6.7 - m) / 7.2, 0.0, 1.0);
+        // subtle scintillation, stronger near the horizon like real air
+        float tw = 1.0 - (0.12 + 0.25 * (1.0 - horizon)) * (0.5 + 0.5 * sin(uTime * (1.1 + fract(position.x) * 2.3) + position.z));
+        vA = pow(bright, 1.55) * horizon * tw;
+        // B-V color index -> blackbody-ish tint
+        float ci = clamp(aStar.y, -0.3, 1.8);
+        vTint = mix(vec3(0.72, 0.82, 1.0), vec3(1.0, 0.78, 0.55), clamp(ci * 0.62 + 0.19, 0.0, 1.0));
+        gl_PointSize = 1.5 + bright * bright * 6.0;
+        gl_Position = projectionMatrix * viewMatrix * wp;
+      }
+    `,
+    fragmentShader: /* glsl */`
+      varying float vA;
+      varying vec3 vTint;
+      void main() {
+        vec2 d = gl_PointCoord - 0.5;
+        float fall = smoothstep(0.5, 0.08, length(d));
+        float a = vA * fall;
+        if (a < 0.004) discard;
+        gl_FragColor = vec4(vTint, a);
+      }
+    `,
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  });
+  const points = new THREE.Points(geo, mat);
+  points.frustumCulled = false;
+
+  // spin carries sidereal rotation about the pole; tilt lays the pole at
+  // the latitude altitude over the gallery's north (-Z)
+  const spin = new THREE.Group();
+  spin.add(points);
+  const tilt = new THREE.Group();
+  tilt.add(spin);
+  tilt.rotation.x = -(Math.PI / 2 - OBSERVER.lat * Math.PI / 180);
+  scene.add(tilt);
+  state.sky = { tilt, spin, mat, points };
+}
+
+function tickSky() {
+  if (!state.sky) return;
+  // spin phase derived + verified against textbook alt/az (Polaris, Vega):
+  // a star at hour angle 0 must transit the southern meridian
+  state.sky.spin.rotation.y = -(Math.PI / 2) - lstRadians(new Date());
+  state.sky.mat.uniforms.uTime.value = clock.elapsedTime;
 }
 
 // ---------- dust motes with twinkle ----------
@@ -1160,6 +1276,7 @@ async function boot() {
   }
   addMotes();
   buildHeart(roster.map((r) => r.lesson).join(''));
+  buildSky().catch(() => {}); // the room stands even if the sky won't load
   addTitle(today ? new Date().toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' }) : '');
   document.getElementById('loading').hidden = true;
 
@@ -1231,6 +1348,7 @@ renderer.setAnimationLoop(() => {
   tickPendingSelect();
   tickPing();
   tickToast();
+  tickSky();
   hover(dt);
   if (state.motes) state.motes.material.uniforms.uTime.value = t;
   if (state.heart) {
@@ -1262,4 +1380,4 @@ boot().catch((err) => {
 });
 
 // debug handle (harmless in production; used by the build's own tests)
-window.NG = { state, teleportTo, teleportToPoint, toggleDocent, toggleReader, activate, tickTeleport, hover, clock, camera, rig, scene, renderer, startDrone, stopDrone };
+window.NG = { state, teleportTo, teleportToPoint, toggleDocent, toggleReader, activate, tickTeleport, tickSky, lstRadians, OBSERVER, hover, clock, camera, rig, scene, renderer, startDrone, stopDrone };
