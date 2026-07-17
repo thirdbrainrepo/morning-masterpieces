@@ -46,9 +46,27 @@ scene.add(new THREE.HemisphereLight(0x28231b, 0x080706, 0.5));
 
 // Floor: near-black stone. Reflections are painted (see hang()), so the
 // floor itself stays opaque and cheap.
+const floorNoise = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  const id = g.createImageData(256, 256);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const v = 118 + Math.random() * 137;
+    id.data[i] = id.data[i + 1] = id.data[i + 2] = v;
+    id.data[i + 3] = 255;
+  }
+  g.putImageData(id, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(9, 9);
+  return t;
+})();
 const floor = new THREE.Mesh(
   new THREE.CircleGeometry(11, 72).rotateX(-Math.PI / 2),
-  new THREE.MeshStandardMaterial({ color: 0x0a0908, roughness: 0.5, metalness: 0.2, dithering: true })
+  new THREE.MeshStandardMaterial({
+    color: 0x0a0908, roughness: 0.5, metalness: 0.2, dithering: true,
+    roughnessMap: floorNoise, bumpMap: floorNoise, bumpScale: 0.0009,
+  })
 );
 floor.userData = { kind: 'floor' };
 scene.add(floor);
@@ -252,7 +270,9 @@ const BEAM_FRAG = /* glsl */`
   uniform float uOpacity;
   uniform float uDissolve; // 1 = full beam, 0 = gone
   // screen-space hash dither: low-alpha gradients over black band at 8
-  // bits exactly like the wallpaper matte did — same cure, in-shader
+  // bits exactly like the wallpaper matte did. In-headset screenshots
+  // showed ±1 level was not enough against the compositor — two octaves
+  // at ±2 levels breaks the contours for good.
   float hash12(vec2 p) {
     vec3 p3 = fract(vec3(p.xyx) * 0.1031);
     p3 += dot(p3, p3.yzx + 33.33);
@@ -265,7 +285,8 @@ const BEAM_FRAG = /* glsl */`
     float head = smoothstep(0.0, 0.18, vAxial);
     float tail = 1.0 - smoothstep(0.55, 1.0, vAxial);
     float a = uOpacity * rim * head * tail * uDissolve;
-    a += (hash12(gl_FragCoord.xy) - 0.5) * 0.0078; // ±1 level of 8-bit
+    float n = (hash12(gl_FragCoord.xy) - 0.5) + 0.5 * (hash12(gl_FragCoord.yx * 0.37 + 11.7) - 0.5);
+    a += n * 0.0157; // ±2 levels of 8-bit
     gl_FragColor = vec4(uColor, max(a, 0.0));
   }
 `;
@@ -287,12 +308,36 @@ function makeBeamMaterial(height) {
 }
 
 // ---------- hang one work ----------
+// Plaster micro-texture: shader dithering alone couldn't kill the pool
+// banding seen in-headset — real matte walls break smooth light ramps
+// PHYSICALLY with surface variation, so ours do too (shared noise map as
+// roughness + bump). Looks better and bands less than any flat surface.
+function makeNoiseTexture(size = 256, lo = 200, hi = 255) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d');
+  const id = g.createImageData(size, size);
+  for (let i = 0; i < id.data.length; i += 4) {
+    const v = lo + Math.random() * (hi - lo);
+    id.data[i] = id.data[i + 1] = id.data[i + 2] = v;
+    id.data[i + 3] = 255;
+  }
+  g.putImageData(id, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  return t;
+}
+const plasterTex = makeNoiseTexture(256, 205, 255);
+plasterTex.repeat.set(3, 3);
+
 // dithering: near-black lit gradients band at 8 bits without it
 const frameMat = new THREE.MeshStandardMaterial({ color: 0x32271a, roughness: 0.42, metalness: 0.22, dithering: true });
 // muted-gold liner between frame and canvas: catches the spot, separates
 // frame from panel without shouting
 const linerMat = new THREE.MeshStandardMaterial({ color: 0x9a7d4e, roughness: 0.32, metalness: 0.65, dithering: true });
-const panelMat = new THREE.MeshStandardMaterial({ color: 0x110f0b, roughness: 1.0, dithering: true });
+const panelMat = new THREE.MeshStandardMaterial({
+  color: 0x110f0b, roughness: 1.0, dithering: true,
+  roughnessMap: plasterTex, bumpMap: plasterTex, bumpScale: 0.0012,
+});
 const hairMat = new THREE.LineBasicMaterial({ color: 0x5c5548, transparent: true, opacity: 0.55 });
 
 async function hang(item, angleDeg, radius, dims) {
@@ -318,9 +363,11 @@ async function hang(item, angleDeg, radius, dims) {
   }
 
   const cy = 1.5;
+  // a solid monolith, presentable from every side — free roam means the
+  // back of a wall is somewhere a visitor will stand
   const panelW = Math.max(w + 1.3, 2.1), panelH = 3.4;
-  const panel = new THREE.Mesh(new THREE.PlaneGeometry(panelW, panelH), panelMat);
-  panel.position.set(0, panelH / 2, -0.06);
+  const panel = new THREE.Mesh(new THREE.BoxGeometry(panelW, panelH, 0.14), panelMat);
+  panel.position.set(0, panelH / 2, -0.135);
   group.add(panel);
 
   const fw = 0.05, fd = 0.075; // deeper profile: throws real edge light
