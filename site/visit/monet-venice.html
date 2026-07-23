@@ -159,10 +159,29 @@
 
     /* "Save for offline": fetch every track once so the service worker's
        cache-first audio handling owns them. The page shell and stop
-       manifest cache network-first on load. */
-    if (localStorage.getItem('visit-monet-venice-saved') === 'yes') {
-      status.textContent = 'Saved on this device. Airplane mode is fine.';
+       manifest cache network-first on load.
+       The saved-flag is VERIFIED against the actual cache: service-worker
+       version bumps evict media caches, and a stale "saved" badge in a
+       signal-dead basement is exactly the failure this page exists to
+       prevent. */
+    async function verifySaved() {
+      if (localStorage.getItem('visit-monet-venice-saved') !== 'yes') return;
+      try {
+        const probes = await Promise.all(
+          ['00-overture', '09-signac-predecessors', '17-coda'].map((id) =>
+            caches.match(new Request(new URL('audio/' + id + '.m4a', location.href).href)))
+        );
+        if (probes.every(Boolean)) {
+          status.textContent = 'Saved on this device. Airplane mode is fine.';
+        } else {
+          localStorage.removeItem('visit-monet-venice-saved');
+          status.textContent = 'A gallery update cleared the saved copy — tap Save again before you go.';
+        }
+      } catch {
+        status.textContent = 'Saved earlier — tap Save again to be certain.';
+      }
     }
+    verifySaved();
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       let done = 0;
